@@ -1,0 +1,12 @@
+# Ignorar archivos de entorno
+.env
+*.pyc
+*.mp4
+ffmpeg.exe
+ffprobe.exe
+ffplay.exe
+
+# Ignorar carpetas
+venv/
+__pycache__/
+video/
