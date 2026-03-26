@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Análisis de Oratoria — MINEDU</title>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --rojo:       #C8102E;
+  --rojo-dark:  #A50D26;
+  --rojo-light: #FFF1F2;
+  --rojo-mid:   #FECDD3;
+  --plomo:      #6B7280;
+  --plomo-dark: #374151;
+  --plomo-light:#F3F4F6;
+  --plomo-mid:  #E5E7EB;
+  --blanco:     #FFFFFF;
+  --fondo:      #F5F5F4;
+  --texto:      #1C1917;
+  --texto-2:    #57534E;
+  --texto-3:    #A8A29E;
+  --borde:      #E7E5E4;
+  --verde:      #166534;
+  --verde-bg:   #DCFCE7;
+  --amber:      #92400E;
+  --amber-bg:   #FEF3C7;
+  --font-serif: 'Crimson Pro', Georgia, serif;
+  --font-sans:  'DM Sans', system-ui, sans-serif;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body { font-family: var(--font-sans); background: var(--fondo); color: var(--texto); min-height: 100vh; }
+
+/* ── Utilidades ── */
+.hidden  { display: none !important; }
+.view    { display: none; }
+.view.active { display: block; }
+
+/* ── Header ── */
+.header {
+  background: var(--rojo);
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid var(--rojo-dark);
+}
+.header-logo { display: flex; align-items: center; gap: 11px; }
+.header-seal {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--rojo-dark); border: 2px solid rgba(255,255,255,.25);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-serif); font-size: 9px; font-weight: 600;
+  color: #fff; letter-spacing: .05em; flex-shrink: 0;
+}
+.header-text { line-height: 1.3; }
+.header-title { font-size: 13px; font-weight: 500; color: #fff; }
+.header-sub   { font-size: 10px; color: rgba(255,255,255,.6); }
+.header-nav   { display: flex; align-items: center; gap: 4px; }
+.nav-btn {
+  font-size: 12px; color: rgba(255,255,255,.65);
+  background: transparent; border: none;
+  padding: 6px 12px; border-radius: var(--r-sm);
+  cursor: pointer; transition: all .15s; font-family: var(--font-sans);
+}
+.nav-btn:hover  { color: #fff; background: rgba(255,255,255,.1); }
+.nav-btn.active { color: #fff; background: rgba(255,255,255,.15); }
+.user-chip {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(255,255,255,.12); border-radius: 20px;
+  padding: 4px 12px 4px 4px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.15);
+  transition: background .15s; margin-left: 8px;
+}
+.user-chip:hover { background: rgba(255,255,255,.2); }
+.user-avatar {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 500; color: #fff;
+}
+.user-name  { font-size: 11px; color: #fff; }
+.user-role  { font-size: 9px; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .05em; }
+
+/* ── Layout principal ── */
+.layout       { display: flex; min-height: calc(100vh - 54px); }
+.main-content { flex: 1; min-width: 0; }
+.page         { padding: 28px 32px; max-width: 1080px; margin: 0 auto; }
+.page-title   { font-family: var(--font-serif); font-size: 24px; font-weight: 600; color: var(--texto); margin-bottom: 3px; }
+.page-sub     { font-size: 13px; color: var(--texto-2); margin-bottom: 22px; }
+
+/* ── Tarjetas ── */
+.card {
+  background: var(--blanco);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-lg);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.section-label {
+  font-size: 10px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--texto-3); margin-bottom: 12px;
+}
+
+/* ── Botones ── */
+.btn-primary {
+  background: var(--rojo); color: #fff; border: none;
+  border-radius: var(--r-md); padding: 10px 20px;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-sans); transition: background .15s;
+}
+.btn-primary:hover    { background: var(--rojo-dark); }
+.btn-primary:disabled { background: var(--plomo); cursor: not-allowed; }
+.btn-outline {
+  background: transparent; color: var(--plomo-dark);
+  border: 1px solid var(--borde); border-radius: var(--r-md);
+  padding: 9px 18px; font-size: 13px; cursor: pointer;
+  font-family: var(--font-sans); transition: all .15s;
+}
+.btn-outline:hover { background: var(--plomo-light); border-color: var(--plomo-mid); }
+.btn-sm {
+  background: transparent; color: var(--plomo);
+  border: 1px solid var(--borde); border-radius: var(--r-sm);
+  padding: 4px 11px; font-size: 11px; cursor: pointer;
+  font-family: var(--font-sans); transition: all .15s;
+}
+.btn-sm:hover { background: var(--plomo-light); color: var(--texto); }
+
+/* ── Inputs ── */
+input[type="text"], input[type="password"], input[type="email"], select, textarea {
+  width: 100%; padding: 9px 12px; font-size: 13px;
+  font-family: var(--font-sans); color: var(--texto);
+  background: var(--blanco); border: 1px solid var(--borde);
+  border-radius: var(--r-md); outline: none; transition: border-color .15s;
+}
+input:focus, select:focus { border-color: var(--rojo); }
+.field-label { font-size: 11px; color: var(--texto-2); margin-bottom: 5px; }
+.field-wrap  { margin-bottom: 14px; }
+
+/* ── Badges ── */
+.badge { display: inline-block; font-size: 10px; font-weight: 500; padding: 2px 9px; border-radius: 20px; }
+.badge-green  { background: var(--verde-bg);  color: var(--verde); }
+.badge-amber  { background: var(--amber-bg);  color: var(--amber); }
+.badge-red    { background: #FEE2E2; color: #991B1B; }
+.badge-gray   { background: var(--plomo-light); color: var(--plomo); border: 1px solid var(--borde); }
+
+/* ── Tooltips ── */
+.tip-wrap { position: relative; display: inline-flex; align-items: center; }
+.tip-icon {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--plomo-light); border: 1px solid var(--borde);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: help; margin-left: 5px; flex-shrink: 0;
+}
+.tip-icon span { font-size: 8px; font-weight: 500; color: var(--texto-3); }
+.tooltip {
+  display: none; position: absolute; bottom: calc(100% + 7px); left: 50%;
+  transform: translateX(-50%); background: #1C1917; color: #fff;
+  font-size: 11px; line-height: 1.5; padding: 9px 11px;
+  border-radius: var(--r-md); width: 200px; z-index: 999; pointer-events: none;
+}
+.tooltip::after {
+  content: ''; position: absolute; top: 100%; left: 50%;
+  transform: translateX(-50%); border: 5px solid transparent;
+  border-top-color: #1C1917;
+}
+.tip-icon:hover + .tooltip,
+.tip-wrap:hover .tooltip { display: block; }
+
+/* ══════════════════════════════════
+   LOGIN
+══════════════════════════════════ */
+#view-login {
+  min-height: 100vh; display: flex; align-items: center;
+  justify-content: center; background: var(--fondo);
+}
+.login-card {
+  background: var(--blanco); border: 1px solid var(--borde);
+  border-radius: var(--r-lg); padding: 40px 36px; width: 380px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.06);
+}
+.login-seal {
+  width: 56px; height: 56px; border-radius: 50%; background: var(--rojo);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+  font-family: var(--font-serif); font-size: 14px; font-weight: 600; color: #fff;
+}
+.login-title { font-family: var(--font-serif); font-size: 20px; font-weight: 600; text-align: center; margin-bottom: 4px; }
+.login-sub   { font-size: 12px; color: var(--texto-2); text-align: center; margin-bottom: 28px; }
+.login-divider { height: 1px; background: var(--borde); margin: 18px 0 14px; }
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+.role-opt {
+  border: 1px solid var(--borde); border-radius: var(--r-md);
+  padding: 10px 12px; cursor: pointer; transition: all .15s;
+}
+.role-opt:hover    { border-color: var(--rojo); background: var(--rojo-light); }
+.role-opt.selected { border-color: var(--rojo); background: var(--rojo-light); }
+.role-name { font-size: 12px; font-weight: 500; color: var(--texto); }
+.role-desc { font-size: 10px; color: var(--texto-2); margin-top: 3px; line-height: 1.4; }
+.login-error { font-size: 12px; color: var(--rojo); text-align: center; margin-top: 10px; min-height: 18px; }
+
+/* ══════════════════════════════════
+   UPLOAD
+══════════════════════════════════ */
+.upload-zone {
+  border: 1.5px dashed var(--plomo-mid); border-radius: var(--r-lg);
+  padding: 40px 24px; text-align: center;
+  background: var(--plomo-light); cursor: pointer; transition: all .2s;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--rojo); background: var(--rojo-light);
+}
+.upload-icon {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--rojo-light); border: 1px solid var(--rojo-mid);
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;
+}
+.upload-icon svg { width: 20px; height: 20px; stroke: var(--rojo); fill: none; stroke-width: 1.5; }
+.upload-title { font-size: 14px; font-weight: 500; color: var(--texto); margin-bottom: 4px; }
+.upload-sub   { font-size: 12px; color: var(--texto-2); }
+.file-selected {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--rojo-light); border: 1px solid var(--rojo-mid);
+  border-radius: var(--r-md); padding: 12px 16px; margin-top: 12px;
+}
+.file-name { font-size: 13px; font-weight: 500; color: var(--rojo-dark); flex: 1; }
+.file-size { font-size: 11px; color: var(--plomo); }
+
+/* ══════════════════════════════════
+   PROCESAMIENTO
+══════════════════════════════════ */
+.proc-header {
+  display: flex; align-items: center; gap: 14px;
+  padding-bottom: 18px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--borde);
+}
+.proc-file-icon {
+  width: 44px; height: 44px; border-radius: var(--r-md);
+  background: var(--rojo-light); border: 1px solid var(--rojo-mid);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.proc-file-icon svg { width: 22px; height: 22px; stroke: var(--rojo); fill: none; stroke-width: 1.5; }
+.proc-filename { font-size: 14px; font-weight: 500; color: var(--texto); }
+.proc-meta     { font-size: 11px; color: var(--texto-2); margin-top: 2px; }
+.elapsed-box   { margin-left: auto; text-align: right; }
+.elapsed-label { font-size: 10px; color: var(--texto-3); text-transform: uppercase; letter-spacing: .05em; }
+.elapsed-val   { font-size: 16px; font-weight: 500; color: var(--rojo); font-variant-numeric: tabular-nums; }
+
+.step-list { display: flex; flex-direction: column; gap: 0; }
+.step-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--borde);
+  transition: opacity .3s;
+}
+.step-item:last-child { border-bottom: none; }
+.step-item.pending { opacity: .4; }
+.step-dot-wrap { display: flex; flex-direction: column; align-items: center; padding-top: 3px; }
+.step-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  background: var(--borde); transition: background .3s;
+}
+.step-dot.running { background: var(--rojo); animation: pulse 1.2s ease-in-out infinite; }
+.step-dot.done    { background: #16A34A; animation: none; }
+.step-body  { flex: 1; }
+.step-name  { font-size: 13px; font-weight: 500; color: var(--texto); }
+.step-desc  { font-size: 11px; color: var(--texto-3); margin-top: 2px; }
+.step-prog  { height: 3px; background: var(--borde); border-radius: 2px; margin-top: 7px; }
+.step-prog-fill { height: 3px; border-radius: 2px; background: var(--rojo); transition: width .4s ease; }
+.step-status {
+  font-size: 11px; color: var(--texto-3); white-space: nowrap;
+  padding-top: 3px; min-width: 70px; text-align: right;
+}
+.step-status.running { color: var(--rojo); font-weight: 500; }
+.step-status.done    { color: #16A34A; }
+
+.proc-done {
+  display: none; text-align: center; padding: 24px 0 8px;
+  animation: fadeUp .4s ease;
+}
+.done-icon {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--verde-bg); border: 2px solid #86EFAC;
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;
+}
+.done-icon svg { width: 24px; height: 24px; stroke: var(--verde); fill: none; stroke-width: 2.5; }
+.done-title { font-family: var(--font-serif); font-size: 18px; font-weight: 600; color: var(--verde); margin-bottom: 4px; }
+.done-sub   { font-size: 12px; color: var(--texto-2); margin-bottom: 18px; }
+
+.error-box {
+  display: none; background: #FEE2E2; border: 1px solid #FECACA;
+  border-radius: var(--r-md); padding: 14px 16px; margin-top: 16px;
+}
+.error-title { font-size: 13px; font-weight: 500; color: #991B1B; margin-bottom: 4px; }
+.error-msg   { font-size: 12px; color: #B91C1C; }
+
+/* ══════════════════════════════════
+   RESULTADO
+══════════════════════════════════ */
+.result-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 20px;
+}
+.score-hero {
+  display: flex; align-items: center; gap: 24px;
+  padding: 18px 22px; background: var(--rojo-light);
+  border: 1px solid var(--rojo-mid); border-radius: var(--r-lg);
+  margin-bottom: 16px;
+}
+.score-circle {
+  width: 80px; height: 80px; border-radius: 50%; background: var(--rojo);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex-shrink: 0; cursor: help; position: relative;
+}
+.score-circle:hover .sc-tip { display: block; }
+.sc-tip {
+  display: none; position: absolute; top: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%); background: #1C1917; color: #fff;
+  font-size: 11px; line-height: 1.6; padding: 10px 12px;
+  border-radius: var(--r-md); width: 220px; z-index: 999;
+}
+.sc-tip::before {
+  content: ''; position: absolute; bottom: 100%; left: 50%;
+  transform: translateX(-50%); border: 5px solid transparent;
+  border-bottom-color: #1C1917;
+}
+.score-num   { font-family: var(--font-serif); font-size: 28px; font-weight: 600; color: #fff; line-height: 1; }
+.score-denom { font-size: 11px; color: rgba(255,255,255,.6); }
+.score-label { font-family: var(--font-serif); font-size: 17px; font-weight: 600; color: var(--rojo-dark); margin-bottom: 4px; }
+.score-desc  { font-size: 12px; color: #9B1C3B; line-height: 1.6; }
+.score-tags  { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+
+.kpi-layers { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.layer-card { border: 1px solid var(--borde); border-radius: var(--r-lg); overflow: visible; }
+.layer-head { padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
+.layer-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.layer-name { font-size: 13px; font-weight: 500; }
+.layer-sub  { font-size: 10px; }
+.layer-body { padding: 10px 14px; border-top: 1px solid var(--borde); }
+.kpi-row    { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.kpi-row:last-child { margin-bottom: 0; }
+.kpi-label  { font-size: 11px; color: var(--texto-2); min-width: 76px; }
+.kpi-bar    { flex: 1; height: 3px; background: var(--borde); border-radius: 2px; }
+.kpi-fill   { height: 3px; border-radius: 2px; }
+.kpi-val    { font-size: 11px; font-weight: 500; color: var(--texto); min-width: 32px; text-align: right; }
+.layer-coming { padding: 24px 14px; border-top: 1px solid var(--borde); text-align: center; }
+
+.tl-bar   { height: 28px; background: var(--plomo-light); border-radius: 4px; position: relative; overflow: hidden; margin-bottom: 5px; }
+.tl-seg   { position: absolute; top: 0; height: 100%; }
+.tl-lbls  { display: flex; justify-content: space-between; font-size: 10px; color: var(--texto-3); }
+.tl-legend { display: flex; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.tl-li    { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--texto-2); cursor: help; position: relative; }
+.tl-li:hover .legend-tip { display: block; }
+.tl-dot   { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.legend-tip {
+  display: none; position: absolute; bottom: calc(100% + 6px); left: 0;
+  background: #1C1917; color: #fff; font-size: 11px; padding: 8px 10px;
+  border-radius: var(--r-md); width: 180px; line-height: 1.5; z-index: 999;
+}
+.legend-tip::after {
+  content: ''; position: absolute; top: 100%; left: 10px;
+  border: 5px solid transparent; border-top-color: #1C1917;
+}
+
+.metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 16px; }
+.metric-card  { background: var(--plomo-light); border-radius: var(--r-md); padding: 12px 14px; }
+.metric-name  { font-size: 10px; color: var(--texto-2); margin-bottom: 4px; display: flex; align-items: center; }
+.metric-val   { font-family: var(--font-serif); font-size: 20px; font-weight: 600; color: var(--texto); }
+.metric-sub   { font-size: 10px; color: var(--texto-3); margin-top: 2px; }
+
+.feedback-box {
+  background: var(--rojo-light); padding: 16px 18px;
+  border-left: 3px solid var(--rojo); border-radius: 0 var(--r-md) var(--r-md) 0;
+  font-size: 13px; color: var(--texto); line-height: 1.75;
+}
+
+/* ══════════════════════════════════
+   HISTORIAL
+══════════════════════════════════ */
+.hist-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hist-table th {
+  text-align: left; padding: 8px 0; color: var(--texto-3);
+  font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .05em; border-bottom: 1px solid var(--borde);
+}
+.hist-table td { padding: 11px 0; border-bottom: 1px solid var(--borde); color: var(--texto-2); }
+.hist-table td:first-child { color: var(--texto); font-weight: 500; }
+.hist-table tr:last-child td { border-bottom: none; }
+.hist-table tr.clickable { cursor: pointer; }
+.hist-table tr.clickable:hover td { background: var(--rojo-light); }
+.hist-table tr.clickable td:first-child { color: var(--rojo); }
+
+/* ══════════════════════════════════
+   PANEL LATERAL
+══════════════════════════════════ */
+.side-panel {
+  width: 0; overflow: hidden; transition: width .25s ease;
+  background: var(--blanco); border-left: 1px solid var(--borde);
+  flex-shrink: 0;
+}
+.side-panel.open { width: 440px; }
+.panel-inner { width: 440px; padding: 22px; overflow-y: auto; max-height: calc(100vh - 54px); }
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--borde);
+}
+.panel-title { font-family: var(--font-serif); font-size: 15px; font-weight: 600; color: var(--texto); }
+.close-btn {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--plomo-light); border: 1px solid var(--borde);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 14px; color: var(--plomo); transition: all .15s;
+}
+.close-btn:hover { background: var(--borde); color: var(--texto); }
+
+/* ══════════════════════════════════
+   ANIMACIONES
+══════════════════════════════════ */
+@keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.35} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ══════════════════════════════════
+   NOTIFICACIÓN TOAST
+══════════════════════════════════ */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 1000;
+  background: #1C1917; color: #fff; font-size: 13px;
+  padding: 12px 18px; border-radius: var(--r-md);
+  transform: translateY(20px); opacity: 0;
+  transition: all .25s ease; pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* ══════════════════════════════════
+   RESPONSIVE BASICS
+══════════════════════════════════ */
+@media (max-width: 700px) {
+  .kpi-layers   { grid-template-columns: 1fr; }
+  .metrics-grid { grid-template-columns: 1fr 1fr; }
+  .side-panel.open { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div id="view-login">
+  <div class="login-card">
+    <div class="login-seal">MINEDU</div>
+    <div class="login-title">Análisis de Oratoria</div>
+    <div class="login-sub">Ministerio de Educación del Perú · Acceso institucional</div>
+
+    <div class="field-wrap">
+      <div class="field-label">Usuario institucional</div>
+      <input type="email" id="login-user" placeholder="usuario@minedu.gob.pe" autocomplete="username">
+    </div>
+    <div class="field-wrap">
+      <div class="field-label">Contraseña</div>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <div class="login-divider"></div>
+    <div class="field-label" style="margin-bottom:10px">Perfil de acceso</div>
+    <div class="role-grid">
+      <div class="role-opt selected" onclick="selectRole(this,'analista')">
+        <div class="role-name">Analista</div>
+        <div class="role-desc">Sube videos y ve sus propios análisis</div>
+      </div>
+      <div class="role-opt" onclick="selectRole(this,'administrador')">
+        <div class="role-name">Administrador</div>
+        <div class="role-desc">Acceso completo e historial global</div>
+      </div>
+    </div>
+
+    <button class="btn-primary" style="width:100%;justify-content:center" onclick="doLogin()">
+      Ingresar al sistema
+    </button>
+    <div class="login-error" id="login-error"></div>
+    <div style="text-align:center;margin-top:14px;font-size:10px;color:var(--texto-3)">
+      Acceso restringido a personal autorizado · MINEDU 2026
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ APP PRINCIPAL ══════════ -->
+<div id="view-app" class="view">
+  <div class="header">
+    <div class="header-logo">
+      <div class="header-seal">MINEDU</div>
+      <div class="header-text">
+        <div class="header-title">Sistema de Análisis de Oratoria</div>
+        <div class="header-sub">Ministerio de Educación del Perú</div>
+      </div>
+    </div>
+    <div class="header-nav">
+      <button id="nav-upload"  class="nav-btn active" onclick="showPage('upload')">Nuevo análisis</button>
+      <button id="nav-mis"     class="nav-btn"        onclick="showPage('mis')">Mis análisis</button>
+      <button id="nav-history" class="nav-btn hidden"  onclick="showPage('history')">Historial global</button>
+      <div class="user-chip" onclick="doLogout()">
+        <div class="user-avatar" id="user-avatar">AN</div>
+        <div>
+          <div class="user-name" id="user-name">Ana Núñez</div>
+          <div class="user-role" id="user-role">analista</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="main-content">
+      <div class="page">
+
+        <!-- ── UPLOAD ── -->
+        <div id="page-upload" class="view active">
+          <div class="page-title">Nuevo análisis</div>
+          <div class="page-sub">Cargue un video de presentación para obtener el informe de KPIs de oratoria.</div>
+
+          <div class="card">
+            <div class="section-label">Cargar video</div>
+            <div class="upload-zone" id="upload-zone"
+                 onclick="document.getElementById('file-input').click()"
+                 ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFile(event)">
+              <div class="upload-icon">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <div class="upload-title">Arrastre el video aquí o haga clic para seleccionar</div>
+              <div class="upload-sub" style="margin-top:4px">MP4, MOV, AVI, MKV — máximo 2 GB</div>
+            </div>
+            <input type="file" id="file-input" accept="video/*" style="display:none" onchange="fileSelected(this)">
+            <div id="file-preview" class="file-selected hidden">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--rojo)" stroke-width="1.5"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+              <span class="file-name" id="file-name-display">—</span>
+              <span class="file-size" id="file-size-display">—</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px">
+              <div>
+                <div class="field-label">Nombre del presentador</div>
+                <input type="text" id="inp-presentador" placeholder="Ej. Juan Pérez">
+              </div>
+              <div>
+                <div class="field-label">Tipo de presentación</div>
+                <select id="inp-tipo">
+                  <option>Discurso institucional</option>
+                  <option>Exposición técnica</option>
+                  <option>Conferencia de prensa</option>
+                  <option>Clase / charla educativa</option>
+                </select>
+              </div>
+              <div>
+                <div class="field-label">Dependencia / DRE</div>
+                <input type="text" id="inp-dep" placeholder="Ej. DRE Lima">
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button class="btn-outline" onclick="resetUpload()">Limpiar</button>
+            <button class="btn-primary" id="btn-analizar" onclick="iniciarAnalisis()" disabled>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Iniciar análisis
+            </button>
+          </div>
+        </div>
+
+        <!-- ── PROCESAMIENTO ── -->
+        <div id="page-processing" class="view">
+          <div class="page-title">Analizando presentación</div>
+          <div class="page-sub">El sistema está procesando el video. Este proceso puede tomar varios minutos dependiendo de la duración.</div>
+
+          <div class="card">
+            <div class="proc-header">
+              <div class="proc-file-icon">
+                <svg viewBox="0 0 24 24"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+              </div>
+              <div>
+                <div class="proc-filename" id="proc-filename">—</div>
+                <div class="proc-meta" id="proc-meta">—</div>
+              </div>
+              <div class="elapsed-box">
+                <div class="elapsed-label">Tiempo</div>
+                <div class="elapsed-val" id="elapsed">0:00</div>
+              </div>
+            </div>
+
+            <div class="step-list" id="step-list">
+              <div class="step-item" id="step-upload">
+                <div class="step-dot-wrap"><div class="step-dot" id="dot-upload"></div></div>
+                <div class="step-body">
+                  <div class="step-name">Subiendo video</div>
+                  <div class="step-desc">Transfiriendo archivo al servidor...</div>
+                  <div class="step-prog"><div class="step-prog-fill" id="prog-upload" style="width:0%"></div></div>
+                </div>
+                <div class="step-status" id="stat-upload">pendiente</div>
+              </div>
+              <div class="step-item pending" id="step-audio">
+                <div class="step-dot-wrap"><div class="step-dot" id="dot-audio"></div></div>
+                <div class="step-body">
+                  <div class="step-name">Extracción de audio</div>
+                  <div class="step-desc">Convirtiendo a WAV 16kHz mono con ffmpeg...</div>
+                  <div class="step-prog"><div class="step-prog-fill" id="prog-audio" style="width:0%"></div></div>
+                </div>
+                <div class="step-status" id="stat-audio">pendiente</div>
+              </div>
+              <div class="step-item pending" id="step-trans">
+                <div class="step-dot-wrap"><div class="step-dot" id="dot-trans"></div></div>
+                <div class="step-body">
+                  <div class="step-name">Transcripción (Whisper)</div>
+                  <div class="step-desc">Detectando palabras y timestamps en español...</div>
+                  <div class="step-prog"><div class="step-prog-fill" id="prog-trans" style="width:0%"></div></div>
+                </div>
+                <div class="step-status" id="stat-trans">pendiente</div>
+              </div>
+              <div class="step-item pending" id="step-kpi">
+                <div class="step-dot-wrap"><div class="step-dot" id="dot-kpi"></div></div>
+                <div class="step-body">
+                  <div class="step-name">Análisis de KPIs</div>
+                  <div class="step-desc">Speech time · Ritmo · Sentimiento · Claridad · Audio</div>
+                  <div class="step-prog"><div class="step-prog-fill" id="prog-kpi" style="width:0%"></div></div>
+                </div>
+                <div class="step-status" id="stat-kpi">pendiente</div>
+              </div>
+              <div class="step-item pending" id="step-feed">
+                <div class="step-dot-wrap"><div class="step-dot" id="dot-feed"></div></div>
+                <div class="step-body">
+                  <div class="step-name">Generación de informe</div>
+                  <div class="step-desc">Calculando scores y narrativa final...</div>
+                  <div class="step-prog"><div class="step-prog-fill" id="prog-feed" style="width:0%"></div></div>
+                </div>
+                <div class="step-status" id="stat-feed">pendiente</div>
+              </div>
+            </div>
+
+            <div class="proc-done" id="proc-done">
+              <div class="done-icon">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="done-title">Análisis completado</div>
+              <div class="done-sub">El informe está listo para revisar.</div>
+              <button class="btn-primary" onclick="verResultado()">Ver informe completo</button>
+            </div>
+
+            <div class="error-box" id="error-box">
+              <div class="error-title">Error en el análisis</div>
+              <div class="error-msg" id="error-msg">—</div>
+              <div style="margin-top:10px">
+                <button class="btn-outline" onclick="showPage('upload')">Volver e intentar de nuevo</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── RESULTADO ── -->
+        <div id="page-result" class="view">
+          <div class="result-header">
+            <div>
+              <div class="page-title" id="result-title">Informe de análisis</div>
+              <div class="page-sub"  id="result-meta">—</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn-outline" onclick="compartirResultado()">Compartir enlace</button>
+              <button class="btn-primary"  onclick="exportarPDF()">Exportar PDF</button>
+            </div>
+          </div>
+          <div id="result-body"></div>
+        </div>
+
+        <!-- ── MIS ANÁLISIS ── -->
+        <div id="page-mis" class="view">
+          <div class="page-title">Mis análisis</div>
+          <div class="page-sub">Presentaciones que has analizado.</div>
+          <div class="card">
+            <div id="mis-body">
+              <div style="text-align:center;padding:32px 0;color:var(--texto-3);font-size:13px">
+                Cargando análisis...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── HISTORIAL GLOBAL (solo admin) ── -->
+        <div id="page-history" class="view">
+          <div class="page-title">Historial global</div>
+          <div class="page-sub">Todas las presentaciones analizadas. Haga clic en una fila para ver el informe completo.</div>
+          <div class="card">
+            <div id="history-body">
+              <div style="text-align:center;padding:32px 0;color:var(--texto-3);font-size:13px">
+                Cargando historial...
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Panel lateral (admin) -->
+    <div class="side-panel" id="side-panel">
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div class="panel-title" id="panel-title">Informe</div>
+          <div class="close-btn" onclick="closePanel()">✕</div>
+        </div>
+        <div id="panel-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// CONFIG — URL de la API
+// ══════════════════════════════════════════════════════
+const API_BASE = '';
+
+// ══════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════════════════════
+const state = {
+  role: 'analista',
+  user: null,
+  selectedFile: null,
+  currentJobId: null,
+  currentResult: null,
+  pollInterval: null,
+  elapsedInterval: null,
+  elapsedSecs: 0,
+};
+
+// ══════════════════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════════════════
+function selectRole(el, role) {
+  document.querySelectorAll('.role-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  state.role = role;
+}
+
+function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const err  = document.getElementById('login-error');
+
+  if (!user || !pass) {
+    err.textContent = 'Ingrese usuario y contraseña.';
+    return;
+  }
+  // Autenticación simulada — reemplazar con fetch() al endpoint real
+  state.user = user;
+  err.textContent = '';
+  document.getElementById('view-login').style.display = 'none';
+  document.getElementById('view-app').classList.add('active');
+
+  const initials = user.split('@')[0].slice(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('user-name').textContent   = user.split('@')[0];
+  document.getElementById('user-role').textContent   = state.role;
+
+  if (state.role === 'administrador') {
+    document.getElementById('nav-history').classList.remove('hidden');
+  }
+  showPage('upload');
+}
+
+function doLogout() {
+  clearTimers();
+  document.getElementById('view-app').classList.remove('active');
+  document.getElementById('view-login').style.display = 'flex';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  state.user = null; state.selectedFile = null; state.currentJobId = null;
+}
+
+// ══════════════════════════════════════════════════════
+// NAVEGACIÓN
+// ══════════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('#view-app .page .view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('page-' + name);
+  if (el) el.classList.add('active');
+
+  ['upload','mis','history'].forEach(n => {
+    const btn = document.getElementById('nav-' + n);
+    if (btn) btn.classList.toggle('active', n === name);
+  });
+
+  if (name === 'mis')     loadMisAnalisis();
+  if (name === 'history') loadHistorial();
+}
+
+// ══════════════════════════════════════════════════════
+// UPLOAD — drag & drop + input
+// ══════════════════════════════════════════════════════
+function dragOver(e)  { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag-over'); }
+function dragLeave(e) { document.getElementById('upload-zone').classList.remove('drag-over'); }
+function dropFile(e)  {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) applyFile(file);
+}
+function fileSelected(input) { if (input.files[0]) applyFile(input.files[0]); }
+
+function applyFile(file) {
+  state.selectedFile = file;
+  document.getElementById('file-name-display').textContent = file.name;
+  document.getElementById('file-size-display').textContent = formatBytes(file.size);
+  document.getElementById('file-preview').classList.remove('hidden');
+  document.getElementById('btn-analizar').disabled = false;
+}
+
+function resetUpload() {
+  state.selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-preview').classList.add('hidden');
+  document.getElementById('btn-analizar').disabled = true;
+  document.getElementById('inp-presentador').value = '';
+  document.getElementById('inp-dep').value = '';
+}
+
+// ══════════════════════════════════════════════════════
+// INICIAR ANÁLISIS — POST /analyze/upload
+// ══════════════════════════════════════════════════════
+async function iniciarAnalisis() {
+  if (!state.selectedFile) return;
+
+  const presentador = document.getElementById('inp-presentador').value.trim() || 'Sin nombre';
+  const tipo        = document.getElementById('inp-tipo').value;
+  const dep         = document.getElementById('inp-dep').value.trim() || '—';
+
+  showPage('processing');
+  document.getElementById('proc-filename').textContent = state.selectedFile.name;
+  document.getElementById('proc-meta').textContent     = `${formatBytes(state.selectedFile.size)} · ${presentador} · ${dep}`;
+  resetSteps();
+  startElapsed();
+
+  try {
+    // ── Paso 1: subir archivo ──
+    setStep('upload', 'running');
+    animateProgress('prog-upload', 3000);
+
+    const formData = new FormData();
+    formData.append('file', state.selectedFile);
+
+    const res = await fetch(`${API_BASE}/analyze/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    state.currentJobId = data.job_id;
+
+    setStep('upload', 'done');
+
+    // ── Pasos 2-4: polling al job ──
+    startPolling();
+
+  } catch (err) {
+    clearTimers();
+    setStep('upload', 'done');
+    showError('No se pudo conectar con el servidor. Verifique que la API esté corriendo en ' + API_BASE + '.\n\nDetalle: ' + err.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// POLLING — GET /analyze/{job_id}
+// ══════════════════════════════════════════════════════
+function startPolling() {
+  setStep('audio', 'running');
+  animateProgress('prog-audio', 8000);
+
+  let pollCount = 0;
+  state.pollInterval = setInterval(async () => {
+    pollCount++;
+    try {
+      const res  = await fetch(`${API_BASE}/analyze/${state.currentJobId}`);
+      const data = await res.json();
+
+      // Simular progreso visual basado en tiempo
+      updateStepsFromStatus(data.status, pollCount);
+
+      if (data.status === 'done') {
+        clearTimers();
+        state.currentResult = data.result;
+        setStep('trans', 'done');
+        setStep('kpi',   'done');
+        setStep('feed',  'done');
+        document.getElementById('step-list').style.display = 'none';
+        document.getElementById('proc-done').style.display = 'block';
+      }
+
+      if (data.status === 'failed') {
+        clearTimers();
+        showError(data.error || 'Error desconocido en el servidor.');
+      }
+
+    } catch (err) {
+      // Error de red — seguir intentando
+    }
+  }, 3000);
+}
+
+function updateStepsFromStatus(status, tick) {
+  if (status === 'running') {
+    if (tick <= 3) {
+      setStep('audio', 'running');
+      document.getElementById('prog-audio').style.width = Math.min(tick * 25, 75) + '%';
+    } else if (tick <= 8) {
+      setStep('audio', 'done');
+      setStep('trans', 'running');
+      document.getElementById('prog-trans').style.width = Math.min((tick - 3) * 18, 90) + '%';
+    } else if (tick <= 14) {
+      setStep('trans', 'done');
+      setStep('kpi', 'running');
+      document.getElementById('prog-kpi').style.width = Math.min((tick - 8) * 15, 90) + '%';
+    } else {
+      setStep('kpi', 'done');
+      setStep('feed', 'running');
+      document.getElementById('prog-feed').style.width = Math.min((tick - 14) * 20, 90) + '%';
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// VER RESULTADO
+// ══════════════════════════════════════════════════════
+function verResultado() {
+  if (!state.currentResult) return;
+  renderResultado(state.currentResult, document.getElementById('result-body'));
+  const filename = document.getElementById('proc-filename').textContent;
+  document.getElementById('result-title').textContent = 'Informe de análisis';
+  document.getElementById('result-meta').textContent  = `${filename} · ${new Date().toLocaleDateString('es-PE', {day:'numeric',month:'short',year:'numeric'})}`;
+  showPage('result');
+  // guardar en historial local
+  saveToLocalHistory();
+}
+
+// ══════════════════════════════════════════════════════
+// RENDERIZAR RESULTADO
+// ══════════════════════════════════════════════════════
+function renderResultado(result, container) {
+  const fb = result.feedback || {};
+  const score = fb.score_global || 0;
+  const interp = fb.interpretaciones || {};
+  const kpis   = result.kpis || {};
+  const speech = kpis.speech_time || {};
+  const rhythm = kpis.rhythm || {};
+  const sent   = kpis.sentiment || {};
+  const clar   = kpis.clarity || {};
+  const audio  = kpis.audio || {};
+  const struct = clar.structure || {};
+  const tags   = buildTags(interp);
+  const narrativa = fb.narrativa || '—';
+
+  container.innerHTML = `
+  <div class="score-hero">
+    <div class="score-circle">
+      <div class="score-num">${score.toFixed(1)}</div>
+      <div class="score-denom">/ 10</div>
+      <div class="sc-tip">Promedio ponderado:<br>Texto 25% · Audio 25% · Ritmo 20% · Sentimiento 15% · Tiempo de habla 15%</div>
+    </div>
+    <div style="flex:1">
+      <div class="score-label">${getScoreLabel(score)}</div>
+      <div class="score-desc">${getScoreDesc(score)}</div>
+      <div class="score-tags">${tags}</div>
+    </div>
+  </div>
+
+  <div class="section-label">Análisis por capa</div>
+  <div class="kpi-layers">
+    <div class="layer-card">
+      <div class="layer-head" style="background:#FFF1F2">
+        <div class="layer-dot" style="background:var(--rojo)"></div>
+        <div><div class="layer-name" style="color:#9B1C3B">Texto</div><div class="layer-sub" style="color:var(--rojo)">Transcript · NLP</div></div>
+      </div>
+      <div class="layer-body">
+        ${kpiRow('Claridad', clar.clarity_score||0, fmtVal(clar.clarity_score), 'var(--rojo)', 'Fillers + diversidad de vocabulario. 1.0 = máximo.')}
+        ${kpiRow('Estructura', struct.structure_score||0, fmtVal(struct.structure_score), 'var(--rojo)', 'Intro, cierre, conectores y preguntas retóricas.')}
+        ${kpiRow('Sentimiento', ((sent.overall_score||0)+1)/2, (sent.overall_score>=0?'+':'')+fmtVal(sent.overall_score), 'var(--rojo)', 'Tono emocional. -1.0 negativo a +1.0 positivo.')}
+        ${kpiRow('Fillers', 1-Math.min((clar.filler_ratio||0)/0.05,1), String(clar.filler_count||0), '#F59E0B', 'Muletillas detectadas. Óptimo: menos del 3% del total.')}
+      </div>
+    </div>
+    <div class="layer-card">
+      <div class="layer-head" style="background:var(--plomo-light)">
+        <div class="layer-dot" style="background:var(--plomo)"></div>
+        <div><div class="layer-name" style="color:var(--plomo-dark)">Audio</div><div class="layer-sub" style="color:var(--plomo)">Voz · espectrograma</div></div>
+      </div>
+      <div class="layer-body">
+        ${kpiRow('Expresividad', audio.expresividad_score||0, fmtVal(audio.expresividad_score), 'var(--plomo)', 'Variación de pitch. Mayor valor = más expresivo.')}
+        ${kpiRow('Proyección',   audio.proyeccion_score||0,  fmtVal(audio.proyeccion_score),  'var(--plomo)', 'Energía vocal (RMS). Umbral mínimo: 0.05.')}
+        ${kpiRow('Ritmo WPM',    Math.min((rhythm.avg_wpm||0)/160,1), String(Math.round(rhythm.avg_wpm||0)), 'var(--plomo)', 'Palabras por minuto. Óptimo para español: 120–160.')}
+        ${kpiRow('Speech ratio', speech.speech_ratio||0, pct(speech.speech_ratio), 'var(--plomo)', '% del tiempo en que el orador está hablando. Óptimo: 60–75%.')}
+      </div>
+    </div>
+    <div class="layer-card">
+      <div class="layer-head" style="background:#FAFAF9">
+        <div class="layer-dot" style="background:var(--borde)"></div>
+        <div><div class="layer-name" style="color:var(--texto-3)">Video</div><div class="layer-sub" style="color:var(--plomo-mid)">Expresión · gestos</div></div>
+      </div>
+      <div class="layer-coming">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--plomo-light);display:flex;align-items:center;justify-content:center;margin:0 auto 8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--texto-3)" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div style="font-size:11px;font-weight:500;color:var(--texto-3);margin-bottom:3px">Próximamente</div>
+        <div style="font-size:10px;color:var(--plomo-mid);line-height:1.5">Expresión facial, postura y gestos de apoyo</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Timeline de la presentación</div>
+  <div class="card" style="padding:16px 20px">
+    ${buildTimeline(rhythm, sent)}
+    <div class="tl-legend">
+      <div class="tl-li"><div class="tl-dot" style="background:#7C3AED"></div>Habla activa<div class="legend-tip">Segmentos con energía vocal detectada.</div></div>
+      <div class="tl-li"><div class="tl-dot" style="background:var(--rojo)"></div>Tono positivo<div class="legend-tip">Sentimiento positivo detectado por NLP.</div></div>
+      <div class="tl-li"><div class="tl-dot" style="background:var(--plomo-mid)"></div>Pausa<div class="legend-tip">Silencio mayor a 0.5 segundos.</div></div>
+    </div>
+  </div>
+
+  <div class="section-label">Métricas detalladas</div>
+  <div class="metrics-grid">
+    ${metricCard('WPM promedio',         Math.round(rhythm.avg_wpm||0),       'óptimo 120–160',                 'Palabras por minuto sobre tiempo de habla efectivo.')}
+    ${metricCard('Pausas estratégicas',  rhythm.strategic_pauses||0,          'prom. '+fmtVal(speech.avg_silence)+'s', 'Silencios >1.5s que indican énfasis deliberado.')}
+    ${metricCard('Vocabulario único',    clar.unique_words||0,                'diversity '+fmtVal(clar.vocab_diversity), 'Palabras distintas. Mayor diversidad = léxico más rico.')}
+    ${metricCard('Preguntas retóricas',  struct.preguntas_retoricas||0,       fmtVal(struct.preguntas_por_min)+' por min', 'Técnica de enganche con la audiencia.')}
+    ${metricCard('Pitch medio',          Math.round(audio.pitch_mean_hz||0)+' Hz', 'variación '+fmtVal(audio.pitch_variation), 'Frecuencia fundamental promedio de la voz.')}
+    ${metricCard('Energía vocal',        fmtVal(audio.energy_mean,3),         'proyección '+(audio.proyeccion_score>=0.8?'sólida':'mejorable'), 'RMS del audio. Umbral mínimo: 0.05.')}
+    ${metricCard('Conectores',           (Object.keys(struct.conectores||{}).length)+' tipos', (Object.keys(struct.conectores||{}).slice(0,2).join(', '))||'—', 'Tipos: causalidad, contraste, secuencia, ejemplos, conclusión.')}
+    ${metricCard('Fillers',              clar.filler_count||0,                fmtVal(clar.fillers_per_min)+' por min', 'Muletillas detectadas. Óptimo: menos del 3% del total.')}
+  </div>
+
+  <div class="section-label">Feedback narrativo</div>
+  <div class="card">
+    <div class="feedback-box">${narrativa.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>')}</div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// HELPERS DE RENDER
+// ══════════════════════════════════════════════════════
+function kpiRow(label, pctVal, val, color, tip) {
+  const w = Math.round(Math.min(Math.max(pctVal, 0), 1) * 100);
+  return `<div class="kpi-row">
+    <span class="kpi-label">${label}</span>
+    <div class="tip-wrap"><div class="tip-icon"><span>?</span></div><div class="tooltip">${tip}</div></div>
+    <div class="kpi-bar"><div class="kpi-fill" style="width:${w}%;background:${color}"></div></div>
+    <span class="kpi-val">${val}</span>
+  </div>`;
+}
+
+function metricCard(name, val, sub, tip) {
+  return `<div class="metric-card">
+    <div class="metric-name">${name}
+      <div class="tip-wrap"><div class="tip-icon"><span>?</span></div><div class="tooltip">${tip}</div></div>
+    </div>
+    <div class="metric-val">${val}</div>
+    <div class="metric-sub">${sub}</div>
+  </div>`;
+}
+
+function buildTimeline(rhythm, sent) {
+  const timeline = (rhythm.wpm_timeline || []).slice(0, 14);
+  if (!timeline.length) {
+    return `<div class="tl-bar"></div><div class="tl-lbls"><span>0:00</span><span>fin</span></div>`;
+  }
+  const total = (timeline[timeline.length-1]?.second || 1) + 60;
+  const segs  = timeline.map(t => {
+    const left  = (t.second / total * 100).toFixed(1);
+    const width = (60 / total * 100).toFixed(1);
+    const color = t.wpm > 100 ? '#7C3AED' : 'var(--plomo-mid)';
+    return `<div class="tl-seg" style="left:${left}%;width:${width}%;background:${color}"></div>`;
+  }).join('');
+  const sentTimeline = (sent.timeline || []).filter(t => t.label === 'positive');
+  const sentSegs = sentTimeline.map(t => {
+    const left  = (t.second / total * 100).toFixed(1);
+    const width = (60 / total * 100).toFixed(1);
+    return `<div class="tl-seg" style="left:${left}%;width:${width}%;background:var(--rojo);opacity:.6"></div>`;
+  }).join('');
+  const maxSec = total;
+  const lbls = [0, .25, .5, .75, 1].map(f => `<span>${fmtTime(Math.round(f*maxSec))}</span>`).join('');
+  return `<div class="tl-bar">${segs}${sentSegs}</div><div class="tl-lbls">${lbls}</div>`;
+}
+
+function buildTags(interp) {
+  return Object.entries(interp).map(([k,v]) => {
+    const nivel = v.nivel || '';
+    const cls   = v.fortaleza ? 'badge-green' : 'badge-amber';
+    const names = {speech_time:'Tiempo de habla',rhythm:'Ritmo',sentiment:'Sentimiento',clarity:'Claridad',audio:'Expresividad'};
+    return `<span class="badge ${cls}">${names[k]||k}: ${nivel}</span>`;
+  }).join('');
+}
+
+function getScoreLabel(s) {
+  if (s >= 9) return 'Orador destacado';
+  if (s >= 7) return 'Orador competente';
+  if (s >= 5) return 'Orador en desarrollo';
+  return 'Requiere mejora significativa';
+}
+function getScoreDesc(s) {
+  if (s >= 9) return 'Desempeño sobresaliente en todas las dimensiones evaluadas.';
+  if (s >= 7) return 'Buen desempeño general con áreas de mejora identificadas.';
+  if (s >= 5) return 'Desempeño básico con oportunidades claras de mejora.';
+  return 'Se recomienda trabajo intensivo en las dimensiones clave.';
+}
+
+// ══════════════════════════════════════════════════════
+// HISTORIAL LOCAL (localStorage)
+// ══════════════════════════════════════════════════════
+function saveToLocalHistory() {
+  const entry = {
+    job_id:      state.currentJobId,
+    presentador: document.getElementById('inp-presentador').value || 'Sin nombre',
+    tipo:        document.getElementById('inp-tipo').value,
+    dep:         document.getElementById('inp-dep').value || '—',
+    filename:    state.selectedFile?.name || '—',
+    analista:    state.user || '—',
+    fecha:       new Date().toLocaleDateString('es-PE',{day:'numeric',month:'short',year:'numeric'}),
+    score:       state.currentResult?.feedback?.score_global || 0,
+    result:      state.currentResult,
+  };
+  const hist = JSON.parse(localStorage.getItem('kpi_history') || '[]');
+  hist.unshift(entry);
+  localStorage.setItem('kpi_history', JSON.stringify(hist.slice(0, 50)));
+}
+
+function loadMisAnalisis() {
+  const hist = JSON.parse(localStorage.getItem('kpi_history') || '[]');
+  const body = document.getElementById('mis-body');
+  if (!hist.length) {
+    body.innerHTML = `<div style="text-align:center;padding:32px 0;color:var(--texto-3);font-size:13px">Aún no has realizado ningún análisis.</div>`;
+    return;
+  }
+  const rows = hist.map(e => `
+    <tr>
+      <td>${e.presentador}</td>
+      <td style="color:var(--texto-2)">${e.tipo}</td>
+      <td style="color:var(--texto-2)">${e.fecha}</td>
+      <td style="text-align:right"><span class="badge ${e.score>=8?'badge-green':e.score>=6?'badge-amber':'badge-red'}">${e.score.toFixed(1)}</span></td>
+      <td style="text-align:right">
+        <span style="display:flex;gap:5px;justify-content:flex-end">
+          <button class="btn-sm" onclick='verDesdeHistorial(${JSON.stringify(e)})'>Ver</button>
+          <button class="btn-sm" onclick="compartirLink('${e.job_id}')">Compartir</button>
+        </span>
+      </td>
+    </tr>`).join('');
+  body.innerHTML = `<table class="hist-table">
+    <thead><tr><th>Presentador</th><th>Tipo</th><th>Fecha</th><th style="text-align:right">Score</th><th style="text-align:right">Acción</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function loadHistorial() {
+  // En producción: fetch(`${API_BASE}/jobs`) con token de admin
+  // Por ahora usa el mismo localStorage
+  loadMisAnalisis();
+  document.getElementById('history-body').innerHTML = document.getElementById('mis-body').innerHTML;
+  // Hacer filas clickables para el panel lateral
+  document.querySelectorAll('#history-body .hist-table tbody tr').forEach((tr, i) => {
+    tr.classList.add('clickable');
+    const hist = JSON.parse(localStorage.getItem('kpi_history') || '[]');
+    if (hist[i]) tr.onclick = () => openPanel(hist[i]);
+  });
+}
+
+function verDesdeHistorial(entry) {
+  state.currentResult = entry.result;
+  state.currentJobId  = entry.job_id;
+  renderResultado(entry.result, document.getElementById('result-body'));
+  document.getElementById('result-title').textContent = `Informe — ${entry.presentador}`;
+  document.getElementById('result-meta').textContent  = `${entry.filename} · ${entry.fecha}`;
+  showPage('result');
+}
+
+// ══════════════════════════════════════════════════════
+// PANEL LATERAL
+// ══════════════════════════════════════════════════════
+function openPanel(entry) {
+  document.getElementById('panel-title').textContent = `${entry.presentador} — ${entry.fecha}`;
+  const pb = document.getElementById('panel-body');
+  const score = entry.score || 0;
+  pb.innerHTML = `
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--borde)">
+      <div style="width:52px;height:52px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <span style="font-family:var(--font-serif);font-size:18px;font-weight:600;color:#fff">${score.toFixed(1)}</span>
+      </div>
+      <div>
+        <div style="font-size:14px;font-weight:500;color:var(--texto);margin-bottom:2px">${entry.presentador}</div>
+        <div style="font-size:11px;color:var(--texto-2)">${entry.tipo} · ${entry.dep}</div>
+        <div style="font-size:11px;color:var(--texto-3)">Analista: ${entry.analista} · ${entry.fecha}</div>
+      </div>
+    </div>
+    <div id="panel-result-body"></div>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button class="btn-primary" style="font-size:11px;padding:7px 14px" onclick="exportarPDF()">PDF</button>
+      <button class="btn-outline"  style="font-size:11px" onclick="compartirLink('${entry.job_id}')">Compartir</button>
+    </div>`;
+  if (entry.result) renderResultado(entry.result, document.getElementById('panel-result-body'));
+  document.getElementById('side-panel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('side-panel').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════════
+// COMPARTIR / EXPORTAR
+// ══════════════════════════════════════════════════════
+function compartirResultado() {
+  compartirLink(state.currentJobId);
+}
+function compartirLink(jobId) {
+  const url = `${window.location.origin}?job=${jobId}`;
+  navigator.clipboard?.writeText(url).catch(()=>{});
+  showToast('Enlace copiado al portapapeles');
+}
+function exportarPDF() {
+  showToast('Función de exportación PDF próximamente disponible');
+}
+
+// ══════════════════════════════════════════════════════
+// PASOS DE PROCESAMIENTO
+// ══════════════════════════════════════════════════════
+function resetSteps() {
+  ['upload','audio','trans','kpi','feed'].forEach((k, i) => {
+    const step = document.getElementById('step-'+k);
+    if (step) step.classList.toggle('pending', i > 0);
+    const dot = document.getElementById('dot-'+k);
+    if (dot) { dot.className = 'step-dot'; dot.style.background = i===0?'var(--rojo)':'var(--borde)'; }
+    const prog = document.getElementById('prog-'+k);
+    if (prog) prog.style.width = '0%';
+    const stat = document.getElementById('stat-'+k);
+    if (stat) { stat.textContent = i===0?'en proceso':'pendiente'; stat.className = 'step-status'+(i===0?' running':''); }
+  });
+  document.getElementById('step-list').style.display = 'block';
+  document.getElementById('proc-done').style.display = 'none';
+  document.getElementById('error-box').style.display = 'none';
+}
+
+function setStep(key, status) {
+  const step = document.getElementById('step-'+key);
+  const dot  = document.getElementById('dot-'+key);
+  const stat = document.getElementById('stat-'+key);
+  if (!step) return;
+  step.classList.remove('pending');
+  dot.className = 'step-dot' + (status==='running'?' running':'');
+  dot.style.background = status==='done' ? '#16A34A' : status==='running' ? 'var(--rojo)' : 'var(--borde)';
+  stat.textContent = status==='done' ? 'completado' : status==='running' ? 'en proceso' : 'pendiente';
+  stat.className   = 'step-status' + (status==='running'?' running':status==='done'?' done':'');
+}
+
+function animateProgress(id, duration) {
+  const el    = document.getElementById(id);
+  const start = Date.now();
+  const anim  = setInterval(() => {
+    const pct = Math.min(90, (Date.now() - start) / duration * 100);
+    el.style.width = pct + '%';
+    if (pct >= 90) clearInterval(anim);
+  }, 80);
+}
+
+function showError(msg) {
+  document.getElementById('step-list').style.display = 'block';
+  document.getElementById('error-box').style.display = 'block';
+  document.getElementById('error-msg').textContent   = msg;
+}
+
+// ══════════════════════════════════════════════════════
+// TIMERS
+// ══════════════════════════════════════════════════════
+function startElapsed() {
+  state.elapsedSecs = 0;
+  state.elapsedInterval = setInterval(() => {
+    state.elapsedSecs++;
+    const m = Math.floor(state.elapsedSecs / 60);
+    const s = state.elapsedSecs % 60;
+    const el = document.getElementById('elapsed');
+    if (el) el.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+  }, 1000);
+}
+
+function clearTimers() {
+  if (state.pollInterval)    clearInterval(state.pollInterval);
+  if (state.elapsedInterval) clearInterval(state.elapsedInterval);
+  state.pollInterval = null;
+  state.elapsedInterval = null;
+}
+
+// ══════════════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ══════════════════════════════════════════════════════
+// FORMATTERS
+// ══════════════════════════════════════════════════════
+function fmtVal(v, d=2) { return v != null ? Number(v).toFixed(d) : '—'; }
+function pct(v)          { return v != null ? (v*100).toFixed(0)+'%' : '—'; }
+function fmtTime(secs)   {
+  const m = Math.floor(secs/60), s = secs%60;
+  return `${m}:${s.toString().padStart(2,'0')}`;
+}
+function formatBytes(bytes) {
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(0)+' KB';
+  return (bytes/(1024*1024)).toFixed(1)+' MB';
+}
+</script>
+</body>
+</html>

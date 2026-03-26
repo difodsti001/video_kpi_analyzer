@@ -4,8 +4,10 @@ import shutil
 import logging
 import warnings
 
-from fastapi import FastAPI, BackgroundTasks, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, BackgroundTasks, UploadFile, File, HTTPException, Depends
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from dotenv import load_dotenv
@@ -29,16 +31,34 @@ os.makedirs(VIDEO_FOLDER, exist_ok=True)
 
 app = FastAPI(title="Video KPI Analyzer", version="1.0.0")
 
+# ── CORS (por si se consume desde otro origen) ────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # ── background task ───────────────────────────────────────────────
+
+def _create_job(filename: str, video_path: str, db):
+    job = AnalysisJob(
+        id=str(uuid.uuid4()),
+        filename=filename,
+        video_path=video_path,
+        status="pending",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job
+
 
 def _run_analysis(job_id: str, video_path: str):
     from shared.database import SessionLocal
     db = SessionLocal()
-
     try:
-        logger.info(f"[{job_id}] Iniciando análisis...")
-
         job = db.query(AnalysisJob).filter_by(id=job_id).first()
         job.status = "running"
         db.commit()
@@ -48,19 +68,18 @@ def _run_analysis(job_id: str, video_path: str):
 
         job.status = "done"
         job.result = result
-
-        logger.info(f"[{job_id}] Análisis completado ✅")
-
     except Exception as e:
-        logger.error(f"[{job_id}] Error: {e}")
-
         job.status = "failed"
         job.error  = str(e)
-
     finally:
         db.commit()
         db.close()
 
+
+# ── Ruta raíz ─────────────────────────
+@app.get("/")
+def serve_index():
+    return FileResponse("index.html")
 
 # ── endpoints ─────────────────────────────────────────────────────
 

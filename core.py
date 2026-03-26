@@ -1,5 +1,6 @@
 import os
 import subprocess
+import uuid
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -14,6 +15,8 @@ from services.sentiment.analyzer     import analyze_sentiment
 from services.clarity.analyzer       import analyze_clarity
 from services.feedback.analyzer      import analyze_feedback
 
+TEMP_FOLDER = os.getenv("TEMP_FOLDER", "./temp")
+os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 class VideoAnalyzer:
 
@@ -38,7 +41,7 @@ class VideoAnalyzer:
     # ── audio ────────────────────────────────────────────────────
 
     def extract_audio(self) -> str:
-        output_wav = "temp_audio.wav"
+        output_wav = os.path.join(TEMP_FOLDER, f"audio_{uuid.uuid4().hex[:8]}.wav")
         subprocess.run([
             FFMPEG_PATH, "-y", "-i", self.video_path,
             "-ac", "1", "-ar", "16000", "-vn", output_wav
@@ -50,13 +53,18 @@ class VideoAnalyzer:
         return self.wav_path
 
     def split_audio(self) -> list[str]:
-        output_pattern = "chunk_%03d.wav"
+        prefix  = os.path.join(TEMP_FOLDER, f"chunk_{uuid.uuid4().hex[:8]}_%03d.wav")
         subprocess.run([
             FFMPEG_PATH, "-i", self.wav_path,
             "-f", "segment", "-segment_time", str(CHUNK_SECONDS),
-            "-c", "copy", output_pattern
+            "-c", "copy", prefix
         ], check=True)
-        self.chunks = sorted([f for f in os.listdir() if f.startswith("chunk_")])
+        base    = os.path.basename(prefix).replace("_%03d.wav", "")
+        self.chunks = sorted([
+        os.path.join(TEMP_FOLDER, f)
+        for f in os.listdir(TEMP_FOLDER)
+        if f.startswith(base)
+    ])
         return self.chunks
 
     def transcribe(self) -> tuple[list, str]:

@@ -10,3 +10,5 @@ ffplay.exe
 venv/
 __pycache__/
 video/
+temp/
+modulos/
