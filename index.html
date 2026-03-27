@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sistema de Análisis de Oratoria — MINEDU</title>
+<title>Sistema de Análisis de Videos — MINEDU</title>
 <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -456,7 +456,7 @@ input:focus, select:focus { border-color: var(--rojo); }
 <div id="view-login">
   <div class="login-card">
     <div class="login-seal">MINEDU</div>
-    <div class="login-title">Análisis de Oratoria</div>
+    <div class="login-title">Análisis de videos</div>
     <div class="login-sub">Ministerio de Educación del Perú · Acceso institucional</div>
 
     <div class="field-wrap">
@@ -497,7 +497,7 @@ input:focus, select:focus { border-color: var(--rojo); }
     <div class="header-logo">
       <div class="header-seal">MINEDU</div>
       <div class="header-text">
-        <div class="header-title">Sistema de Análisis de Oratoria</div>
+        <div class="header-title">Sistema de Análisis de Videos</div>
         <div class="header-sub">Ministerio de Educación del Perú</div>
       </div>
     </div>
@@ -522,7 +522,7 @@ input:focus, select:focus { border-color: var(--rojo); }
         <!-- ── UPLOAD ── -->
         <div id="page-upload" class="view active">
           <div class="page-title">Nuevo análisis</div>
-          <div class="page-sub">Cargue un video de presentación para obtener el informe de KPIs de oratoria.</div>
+          <div class="page-sub">Cargue un video de presentación para obtener el informe de KPIs de videos.</div>
 
           <div class="card">
             <div class="section-label">Cargar video</div>
@@ -557,7 +557,7 @@ input:focus, select:focus { border-color: var(--rojo); }
                 </select>
               </div>
               <div>
-                <div class="field-label">Dependencia / DRE</div>
+                <div class="field-label">DRE</div>
                 <input type="text" id="inp-dep" placeholder="Ej. DRE Lima">
               </div>
             </div>
@@ -984,38 +984,55 @@ function renderResultado(result, container) {
     <div class="layer-card">
       <div class="layer-head" style="background:#FFF1F2">
         <div class="layer-dot" style="background:var(--rojo)"></div>
-        <div><div class="layer-name" style="color:#9B1C3B">Texto</div><div class="layer-sub" style="color:var(--rojo)">Transcript · NLP</div></div>
+        <div>
+          <div class="layer-name" style="color:#9B1C3B">Texto</div>
+          <div class="layer-sub" style="color:var(--rojo)">Qué dices</div>
+        </div>
       </div>
       <div class="layer-body">
-        ${kpiRow('Claridad', clar.clarity_score||0, fmtVal(clar.clarity_score), 'var(--rojo)', 'Fillers + diversidad de vocabulario. 1.0 = máximo.')}
-        ${kpiRow('Estructura', struct.structure_score||0, fmtVal(struct.structure_score), 'var(--rojo)', 'Intro, cierre, conectores y preguntas retóricas.')}
-        ${kpiRow('Sentimiento', ((sent.overall_score||0)+1)/2, (sent.overall_score>=0?'+':'')+fmtVal(sent.overall_score), 'var(--rojo)', 'Tono emocional. -1.0 negativo a +1.0 positivo.')}
-        ${kpiRow('Fillers', 1-Math.min((clar.filler_ratio||0)/0.05,1), String(clar.filler_count||0), '#F59E0B', 'Muletillas detectadas. Óptimo: menos del 3% del total.')}
+        ${kpiRow('Claridad', clar.clarity_score||0, fmtVal(clar.clarity_score), 'var(--rojo)', 'Qué tan fácil es entender el mensaje. Mejora usando frases más cortas y evitando repeticiones.')}
+        
+        ${kpiRow('Estructura', struct.structure_score||0, fmtVal(struct.structure_score), 'var(--rojo)', 'Qué tan bien organizas las ideas (inicio, desarrollo y cierre). Una buena estructura facilita la comprensión.')}
+        
+        ${kpiRow('Sentimiento', ((sent.overall_score||0)+1)/2, (sent.overall_score>=0?'+':'')+fmtVal(sent.overall_score), 'var(--rojo)', 'Indica si el mensaje suena positivo, neutro o negativo. Un tono positivo conecta mejor con la audiencia. Negativo: -1.0, Positivo: +1.0')}
+        
+        ${kpiRow('Fillers', 1-Math.min((clar.filler_ratio||0)/0.05,1), String(clar.filler_count||0), '#F59E0B', 'Cantidad de muletillas como "eh" o "este". Menos muletillas hacen una comunicación más clara y profesional.')}
       </div>
     </div>
+
     <div class="layer-card">
       <div class="layer-head" style="background:var(--plomo-light)">
         <div class="layer-dot" style="background:var(--plomo)"></div>
-        <div><div class="layer-name" style="color:var(--plomo-dark)">Audio</div><div class="layer-sub" style="color:var(--plomo)">Voz · espectrograma</div></div>
+        <div>
+          <div class="layer-name" style="color:var(--plomo-dark)">Audio</div>
+          <div class="layer-sub" style="color:var(--plomo)">Cómo lo dices</div>
+        </div>
       </div>
       <div class="layer-body">
-        ${kpiRow('Expresividad', audio.expresividad_score||0, fmtVal(audio.expresividad_score), 'var(--plomo)', 'Variación de pitch. Mayor valor = más expresivo.')}
-        ${kpiRow('Proyección',   audio.proyeccion_score||0,  fmtVal(audio.proyeccion_score),  'var(--plomo)', 'Energía vocal (RMS). Umbral mínimo: 0.05.')}
-        ${kpiRow('Ritmo WPM',    Math.min((rhythm.avg_wpm||0)/160,1), String(Math.round(rhythm.avg_wpm||0)), 'var(--plomo)', 'Palabras por minuto. Óptimo para español: 120–160.')}
-        ${kpiRow('Speech ratio', speech.speech_ratio||0, pct(speech.speech_ratio), 'var(--plomo)', '% del tiempo en que el orador está hablando. Óptimo: 60–75%.')}
+        ${kpiRow('Expresividad', audio.expresividad_score||0, fmtVal(audio.expresividad_score), 'var(--plomo)', 'Qué tanto varía la voz al hablar. Más variación hace una presentación más dinámica y menos monótona.')}
+        
+        ${kpiRow('Proyección', audio.proyeccion_score||0, fmtVal(audio.proyeccion_score), 'var(--plomo)', 'Qué tan fuerte y clara se escucha la voz. Una buena proyección transmite seguridad.')}
+        
+        ${kpiRow('Ritmo WPM', Math.min((rhythm.avg_wpm||0)/160,1), String(Math.round(rhythm.avg_wpm||0)), 'var(--plomo)', 'Velocidad al hablar (palabras por minuto). Un ritmo adecuado facilita la comprensión (ideal: 120–160).')}
+        
+        ${kpiRow('Speech ratio', speech.speech_ratio||0, pct(speech.speech_ratio), 'var(--plomo)', 'Porcentaje del tiempo en que se esta hablando. Un buen equilibrio incluye pausas para enfatizar ideas.')}
       </div>
     </div>
+
     <div class="layer-card">
       <div class="layer-head" style="background:#FAFAF9">
         <div class="layer-dot" style="background:var(--borde)"></div>
-        <div><div class="layer-name" style="color:var(--texto-3)">Video</div><div class="layer-sub" style="color:var(--plomo-mid)">Expresión · gestos</div></div>
+        <div>
+          <div class="layer-name" style="color:var(--texto-3)">Video</div>
+          <div class="layer-sub" style="color:var(--plomo-mid)">Cómo te ves</div>
+        </div>
       </div>
       <div class="layer-coming">
         <div style="width:28px;height:28px;border-radius:50%;background:var(--plomo-light);display:flex;align-items:center;justify-content:center;margin:0 auto 8px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--texto-3)" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         </div>
         <div style="font-size:11px;font-weight:500;color:var(--texto-3);margin-bottom:3px">Próximamente</div>
-        <div style="font-size:10px;color:var(--plomo-mid);line-height:1.5">Expresión facial, postura y gestos de apoyo</div>
+        <div style="font-size:10px;color:var(--plomo-mid);line-height:1.5">Expresión facial, postura y uso de gestos</div>
       </div>
     </div>
   </div>
@@ -1024,22 +1041,41 @@ function renderResultado(result, container) {
   <div class="card" style="padding:16px 20px">
     ${buildTimeline(rhythm, sent)}
     <div class="tl-legend">
-      <div class="tl-li"><div class="tl-dot" style="background:#7C3AED"></div>Habla activa<div class="legend-tip">Segmentos con energía vocal detectada.</div></div>
-      <div class="tl-li"><div class="tl-dot" style="background:var(--rojo)"></div>Tono positivo<div class="legend-tip">Sentimiento positivo detectado por NLP.</div></div>
-      <div class="tl-li"><div class="tl-dot" style="background:var(--plomo-mid)"></div>Pausa<div class="legend-tip">Silencio mayor a 0.5 segundos.</div></div>
+      <div class="tl-li">
+        <div class="tl-dot" style="background:#7C3AED"></div>
+        Habla activa
+        <div class="legend-tip">Momentos donde se esta hablando.</div>
+      </div>
+      <div class="tl-li">
+        <div class="tl-dot" style="background:var(--verde)"></div>
+        Tono positivo
+        <div class="legend-tip">Momentos donde el mensaje suena positivo.</div>
+      </div>
+      <div class="tl-li">
+        <div class="tl-dot" style="background:var(--plomo-mid)"></div>
+        Pausa
+        <div class="legend-tip">Momentos de silencio usados para respirar o enfatizar ideas.</div>
+      </div>
     </div>
   </div>
 
   <div class="section-label">Métricas detalladas</div>
   <div class="metrics-grid">
-    ${metricCard('WPM promedio',         Math.round(rhythm.avg_wpm||0),       'óptimo 120–160',                 'Palabras por minuto sobre tiempo de habla efectivo.')}
-    ${metricCard('Pausas estratégicas',  rhythm.strategic_pauses||0,          'prom. '+fmtVal(speech.avg_silence)+'s', 'Silencios >1.5s que indican énfasis deliberado.')}
-    ${metricCard('Vocabulario único',    clar.unique_words||0,                'diversity '+fmtVal(clar.vocab_diversity), 'Palabras distintas. Mayor diversidad = léxico más rico.')}
-    ${metricCard('Preguntas retóricas',  struct.preguntas_retoricas||0,       fmtVal(struct.preguntas_por_min)+' por min', 'Técnica de enganche con la audiencia.')}
-    ${metricCard('Pitch medio',          Math.round(audio.pitch_mean_hz||0)+' Hz', 'variación '+fmtVal(audio.pitch_variation), 'Frecuencia fundamental promedio de la voz.')}
-    ${metricCard('Energía vocal',        fmtVal(audio.energy_mean,3),         'proyección '+(audio.proyeccion_score>=0.8?'sólida':'mejorable'), 'RMS del audio. Umbral mínimo: 0.05.')}
-    ${metricCard('Conectores',           (Object.keys(struct.conectores||{}).length)+' tipos', (Object.keys(struct.conectores||{}).slice(0,2).join(', '))||'—', 'Tipos: causalidad, contraste, secuencia, ejemplos, conclusión.')}
-    ${metricCard('Fillers',              clar.filler_count||0,                fmtVal(clar.fillers_per_min)+' por min', 'Muletillas detectadas. Óptimo: menos del 3% del total.')}
+    ${metricCard('WPM promedio', Math.round(rhythm.avg_wpm||0), 'óptimo 120–160', 'Cantidad de palabras por minuto mientras se habla.')}
+
+    ${metricCard('Pausas estratégicas', rhythm.strategic_pauses||0, 'prom. '+fmtVal(speech.avg_silence)+'s', 'Pausas usadas para enfatizar ideas o dar tiempo a la audiencia para procesar la información.')}
+
+    ${metricCard('Vocabulario único', clar.unique_words||0, 'diversidad '+fmtVal(clar.vocab_diversity), 'Cantidad de palabras diferentes que se usan. Más variedad hace el discurso más rico.')}
+
+    ${metricCard('Preguntas retóricas', struct.preguntas_retoricas||0, fmtVal(struct.preguntas_por_min)+' por min', 'Preguntas usadas para mantener la atención del público.')}
+
+    ${metricCard('Pitch medio', Math.round(audio.pitch_mean_hz||0)+' Hz', 'variación '+fmtVal(audio.pitch_variation), 'Tono promedio de la voz (más grave o más agudo).')}
+
+    ${metricCard('Energía vocal', fmtVal(audio.energy_mean,3), 'proyección '+(audio.proyeccion_score>=0.8?'sólida':'mejorable'), 'Nivel de intensidad de la voz. Una buena energía ayuda a mantener la atención.')}
+
+    ${metricCard('Conectores', (Object.keys(struct.conectores||{}).length)+' tipos', (Object.keys(struct.conectores||{}).slice(0,2).join(', '))||'—', 'Palabras que conectan ideas (como “porque”, “pero”, “además”).')}
+
+    ${metricCard('Fillers', clar.filler_count||0, fmtVal(clar.fillers_per_min)+' por min', 'Muletillas como “eh” o “este”. Reducirlas mejora la fluidez y profesionalismo.')}
   </div>
 
   <div class="section-label">Feedback narrativo</div>
