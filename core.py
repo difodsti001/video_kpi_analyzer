@@ -2,9 +2,11 @@ import os
 import subprocess
 import uuid
 from dotenv import load_dotenv
+import numpy as np
 load_dotenv()
 
 FFMPEG_PATH   = os.getenv("FFMPEG_PATH", "ffmpeg")
+print("Usando FFMPEG:", FFMPEG_PATH)
 CHUNK_SECONDS = int(os.getenv("CHUNK_SECONDS", 600))
 
 from services.transcription.analyzer import transcribe_audio, parse_words, get_duration
@@ -14,9 +16,26 @@ from services.rhythm.audio_analyzer  import analyze_audio
 from services.sentiment.analyzer     import analyze_sentiment
 from services.clarity.analyzer       import analyze_clarity
 from services.feedback.analyzer      import analyze_feedback
+from services.video.analyzer import analyze_posture
 
 TEMP_FOLDER = os.getenv("TEMP_FOLDER", "./temp")
 os.makedirs(TEMP_FOLDER, exist_ok=True)
+
+def _serialize(obj):
+    """Convierte tipos numpy a tipos Python nativos para JSON."""
+    if isinstance(obj, dict):
+        return {k: _serialize(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_serialize(i) for i in obj]
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
 
 class VideoAnalyzer:
 
@@ -37,6 +56,7 @@ class VideoAnalyzer:
         self.clarity  = {}
         self.audio    = {}
         self.feedback = {}
+        self.posture = {}
 
     # ── audio ────────────────────────────────────────────────────
 
@@ -112,6 +132,11 @@ class VideoAnalyzer:
         )
         return self.feedback
 
+    def run_posture(self) -> dict:
+        frames_folder = os.path.join(TEMP_FOLDER, f"frames_{uuid.uuid4().hex[:8]}")
+        self.posture = analyze_posture(self.video_path, frames_folder)
+        return self.posture
+
     # ── limpieza ─────────────────────────────────────────────────
 
     def cleanup(self):
@@ -133,6 +158,7 @@ class VideoAnalyzer:
             self.run_sentiment()
             self.run_clarity()
             self.run_audio()
+            self.run_posture()
             self.run_feedback()
         finally:
             self.cleanup()
@@ -140,7 +166,7 @@ class VideoAnalyzer:
         return self.result()
 
     def result(self) -> dict:
-        return {
+        raw = {
             "duration_seconds": self.duration,
             "total_words":      len(self.all_words),
             "transcript":       self.transcript,
@@ -150,6 +176,8 @@ class VideoAnalyzer:
                 "sentiment":   self.sentiment,
                 "clarity":     self.clarity,
                 "audio":       self.audio,
+                "posture": self.posture,
             },
             "feedback": self.feedback,
         }
+        return _serialize(raw)

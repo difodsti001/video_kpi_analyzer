@@ -10,8 +10,8 @@ class JobStatus(str, Enum):
     failed    = "failed"
 
 class JobCreate(BaseModel):
-    video_path: str           # ruta absoluta en disco
-    filename: str             # nombre legible
+    video_path: str
+    filename: str
 
 class JobResponse(BaseModel):
     job_id: str
