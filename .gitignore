@@ -9,6 +9,5 @@ ffplay.exe
 # Ignorar carpetas
 venv/
 __pycache__/
-video/
 temp/
 modulos/
