@@ -107,19 +107,29 @@ def _create_job(filename: str, video_path: str, db,
 def _run_analysis(job_id: str, video_path: str):
     from shared.database import SessionLocal
     db = SessionLocal()
+
     try:
+        print("=== RUN ANALYSIS ===")
+        print("VIDEO PATH:", video_path)
+
         job = db.query(AnalysisJob).filter_by(id=job_id).first()
         job.status = "running"
         db.commit()
 
         analyzer = VideoAnalyzer(video_path)
-        result   = analyzer.run()
+
+        print("ANTES DE RUN()")
+        result = analyzer.run()
+        print("DESPUÉS DE RUN()")
 
         job.status = "done"
         job.result = result
+
     except Exception as e:
+        print("ERROR REAL:", str(e))
         job.status = "failed"
         job.error  = str(e)
+
     finally:
         db.commit()
         db.close()
