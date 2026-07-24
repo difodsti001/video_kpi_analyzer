@@ -16,7 +16,7 @@ from services.rhythm.audio_analyzer  import analyze_audio
 from services.sentiment.analyzer     import analyze_sentiment
 from services.clarity.analyzer       import analyze_clarity
 from services.feedback.analyzer      import analyze_feedback
-from services.video.analyzer import analyze_posture
+from services.video.analyzer import analyze_posture, analyze_objects
 
 TEMP_FOLDER = os.getenv("TEMP_FOLDER", "./temp")
 os.makedirs(TEMP_FOLDER, exist_ok=True)
@@ -57,6 +57,7 @@ class VideoAnalyzer:
         self.audio    = {}
         self.feedback = {}
         self.posture = {}
+        self.objects   = {} 
 
     # ── audio ────────────────────────────────────────────────────
 
@@ -137,6 +138,13 @@ class VideoAnalyzer:
         self.posture = analyze_posture(self.video_path, frames_folder)
         return self.posture
 
+    def run_objects(self) -> dict:
+        self.objects = analyze_objects(
+            video_path       = self.video_path,
+            duration_seconds = self.duration,
+        )
+        return self.objects
+
     # ── limpieza ─────────────────────────────────────────────────
 
     def cleanup(self):
@@ -159,6 +167,7 @@ class VideoAnalyzer:
             self.run_clarity()
             self.run_audio()
             self.run_posture()
+            self.run_objects() 
             self.run_feedback()
         finally:
             self.cleanup()
@@ -177,6 +186,7 @@ class VideoAnalyzer:
                 "clarity":     self.clarity,
                 "audio":       self.audio,
                 "posture": self.posture,
+                "objects":     self.objects,
             },
             "feedback": self.feedback,
         }

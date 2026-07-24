@@ -36,7 +36,7 @@ Base.metadata.create_all(bind=engine)
 VIDEO_FOLDER = os.getenv("VIDEO_FOLDER", "./video")
 os.makedirs(VIDEO_FOLDER, exist_ok=True)
 
-SECRET_KEY = os.getenv("SECRET_KEY", "cambiar-en-produccion")
+SECRET_KEY = os.getenv("SECRET_KEY", " ")
 ALGORITHM  = "HS256"
 TOKEN_EXP  = 60 * 8
 

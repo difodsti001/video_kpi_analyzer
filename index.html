@@ -178,38 +178,6 @@ input:focus, select:focus { border-color: var(--rojo); }
 .tip-wrap:hover .tooltip { display: block; }
 
 /* ══════════════════════════════════
-   LOGIN
-══════════════════════════════════ */
-#view-login {
-  min-height: 100vh; display: flex; align-items: center;
-  justify-content: center; background: var(--fondo);
-}
-.login-card {
-  background: var(--blanco); border: 1px solid var(--borde);
-  border-radius: var(--r-lg); padding: 40px 36px; width: 380px;
-  box-shadow: 0 4px 24px rgba(0,0,0,.06);
-}
-.login-seal {
-  width: 56px; height: 56px; border-radius: 50%; background: var(--rojo);
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 16px;
-  font-family: var(--font-serif); font-size: 14px; font-weight: 600; color: #fff;
-}
-.login-title { font-family: var(--font-serif); font-size: 20px; font-weight: 600; text-align: center; margin-bottom: 4px; }
-.login-sub   { font-size: 12px; color: var(--texto-2); text-align: center; margin-bottom: 28px; }
-.login-divider { height: 1px; background: var(--borde); margin: 18px 0 14px; }
-.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
-.role-opt {
-  border: 1px solid var(--borde); border-radius: var(--r-md);
-  padding: 10px 12px; cursor: pointer; transition: all .15s;
-}
-.role-opt:hover    { border-color: var(--rojo); background: var(--rojo-light); }
-.role-opt.selected { border-color: var(--rojo); background: var(--rojo-light); }
-.role-name { font-size: 12px; font-weight: 500; color: var(--texto); }
-.role-desc { font-size: 10px; color: var(--texto-2); margin-top: 3px; line-height: 1.4; }
-.login-error { font-size: 12px; color: var(--rojo); text-align: center; margin-top: 10px; min-height: 18px; }
-
-/* ══════════════════════════════════
    UPLOAD
 ══════════════════════════════════ */
 .upload-zone {
@@ -400,6 +368,60 @@ input:focus, select:focus { border-color: var(--rojo); }
 .hist-table tr.clickable td:first-child { color: var(--rojo); }
 
 /* ══════════════════════════════════
+   ELEMENTOS DEL AULA / OBJETOS
+══════════════════════════════════ */
+.obj-resumen { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 20px; }
+.obj-kpi {
+  background: var(--plomo-light); border-radius: var(--r-md);
+  padding: 14px 12px; text-align: center;
+}
+.obj-kpi-val  { font-family: var(--font-serif); font-size: 22px; font-weight: 600; color: var(--texto); line-height: 1.15; }
+.obj-kpi-name { font-size: 10.5px; color: var(--texto-2); margin-top: 4px; line-height: 1.3; }
+
+.obj-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.obj-table thead th {
+  text-align: left; padding: 0 10px 9px; color: var(--texto-3);
+  font-size: 10px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .06em; border-bottom: 1px solid var(--borde); white-space: nowrap;
+}
+.obj-table thead th:not(:first-child) { text-align: center; }
+.obj-table tbody td {
+  padding: 12px 10px; border-bottom: 1px solid var(--borde);
+  color: var(--texto-2); vertical-align: middle;
+}
+.obj-table tbody td:not(:first-child) { text-align: center; }
+.obj-table tbody tr:last-child td { border-bottom: none; }
+.obj-table tbody tr:hover td { background: var(--plomo-light); }
+
+.obj-cat-dot {
+  display: inline-block; width: 7px; height: 7px;
+  border-radius: 50%; margin-right: 6px; flex-shrink: 0;
+}
+
+.obj-pres-bar   { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.obj-pres-track { width: 64px; height: 5px; background: var(--borde); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+.obj-pres-fill  { height: 5px; border-radius: 3px; }
+.obj-pres-bar span { font-size: 11.5px; font-weight: 500; color: var(--texto); min-width: 34px; text-align: left; }
+
+.obj-empty { text-align: center; padding: 32px 0; color: var(--texto-3); font-size: 13px; }
+
+.obj-dist-title {
+  font-size: 10px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--texto-3); margin-bottom: 12px;
+}
+.obj-dist-stack {
+  display: flex; width: 100%; height: 10px; border-radius: 5px;
+  overflow: hidden; background: var(--plomo-light); margin-bottom: 16px;
+}
+.obj-dist-seg { height: 100%; transition: opacity .15s; }
+.obj-dist-seg:hover { opacity: .8; }
+.obj-dist-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 12px 20px; }
+.obj-dist-row:last-child { margin-bottom: 0; }
+.obj-dist-bar-wrap { width: 100%; }
+.obj-dist-track { height: 6px; background: var(--borde); border-radius: 3px; overflow: hidden; }
+.obj-dist-fill  { height: 6px; border-radius: 3px; }
+
+/* ══════════════════════════════════
    PANEL LATERAL
 ══════════════════════════════════ */
 .side-panel {
@@ -455,6 +477,7 @@ input:focus, select:focus { border-color: var(--rojo); }
 @media (max-width: 700px) {
   .kpi-layers   { grid-template-columns: 1fr; }
   .metrics-grid { grid-template-columns: 1fr 1fr; }
+  .obj-resumen  { grid-template-columns: 1fr 1fr; }
   .side-panel.open { width: 100%; }
 }
 
@@ -493,47 +516,8 @@ input:focus, select:focus { border-color: var(--rojo); }
 </head>
 <body>
 
-<!-- ══════════ LOGIN ══════════ -->
-<div id="view-login">
-  <div class="login-card">
-    <div class="login-seal">MINEDU</div>
-    <div class="login-title">Análisis de videos</div>
-    <div class="login-sub">Ministerio de Educación del Perú · Acceso institucional</div>
-
-    <div class="field-wrap">
-      <div class="field-label">Usuario institucional</div>
-      <input type="email" id="login-user" placeholder="usuario@minedu.gob.pe" autocomplete="username">
-    </div>
-    <div class="field-wrap">
-      <div class="field-label">Contraseña</div>
-      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
-    </div>
-
-    <div class="login-divider"></div>
-    <div class="field-label" style="margin-bottom:10px">Perfil de acceso</div>
-    <div class="role-grid">
-      <div class="role-opt selected" onclick="selectRole(this,'analista')">
-        <div class="role-name">Analista</div>
-        <div class="role-desc">Sube videos y ve sus propios análisis</div>
-      </div>
-      <div class="role-opt" onclick="selectRole(this,'administrador')">
-        <div class="role-name">Administrador</div>
-        <div class="role-desc">Acceso completo e historial global</div>
-      </div>
-    </div>
-
-    <button class="btn-primary" style="width:100%;justify-content:center" onclick="doLogin()">
-      Ingresar al sistema
-    </button>
-    <div class="login-error" id="login-error"></div>
-    <div style="text-align:center;margin-top:14px;font-size:10px;color:var(--texto-3)">
-      Acceso restringido a personal autorizado · MINEDU 2026
-    </div>
-  </div>
-</div>
-
 <!-- ══════════ APP PRINCIPAL ══════════ -->
-<div id="view-app" class="view">
+<div id="view-app">
   <div class="header">
     <div class="header-logo">
       <div class="header-seal">MINEDU</div>
@@ -544,15 +528,7 @@ input:focus, select:focus { border-color: var(--rojo); }
     </div>
     <div class="header-nav">
       <button id="nav-upload"  class="nav-btn active" onclick="showPage('upload')">Nuevo análisis</button>
-      <button id="nav-mis"     class="nav-btn"        onclick="showPage('mis')">Mis análisis</button>
-      <button id="nav-history" class="nav-btn hidden"  onclick="showPage('history')">Historial global</button>
-      <div class="user-chip" onclick="doLogout()">
-        <div class="user-avatar" id="user-avatar">AN</div>
-        <div>
-          <div class="user-name" id="user-name">Ana Núñez</div>
-          <div class="user-role" id="user-role">analista</div>
-        </div>
-      </div>
+      <button id="nav-history" class="nav-btn"        onclick="showPage('history')">Historial</button>
     </div>
   </div>
 
@@ -719,23 +695,10 @@ input:focus, select:focus { border-color: var(--rojo); }
           <div id="result-body"></div>
         </div>
 
-        <!-- ── MIS ANÁLISIS ── -->
-        <div id="page-mis" class="view">
-          <div class="page-title">Mis análisis</div>
-          <div class="page-sub">Presentaciones que has analizado.</div>
-          <div class="card">
-            <div id="mis-body">
-              <div style="text-align:center;padding:32px 0;color:var(--texto-3);font-size:13px">
-                Cargando análisis...
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── HISTORIAL GLOBAL (solo admin) ── -->
+        <!-- ── HISTORIAL ── -->
         <div id="page-history" class="view">
-          <div class="page-title">Historial global</div>
-          <div class="page-sub">Todas las presentaciones analizadas. Haga clic en una fila para ver el informe completo.</div>
+          <div class="page-title">Historial de análisis</div>
+          <div class="page-sub">Todos los videos analizados. Haga clic en "Ver" para revisar el informe completo.</div>
           <div class="card">
             <div id="history-body">
               <div style="text-align:center;padding:32px 0;color:var(--texto-3);font-size:13px">
@@ -770,12 +733,16 @@ input:focus, select:focus { border-color: var(--rojo); }
 // ══════════════════════════════════════════════════════
 const API_BASE = '';
 
+// Mostrar la app directamente sin login
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('view-app').classList.add('active');
+  showPage('upload');
+});
+
 // ══════════════════════════════════════════════════════
 // ESTADO GLOBAL
 // ══════════════════════════════════════════════════════
 const state = {
-  role: 'analista',
-  user: null,
   selectedFile: null,
   currentJobId: null,
   currentResult: null,
@@ -785,50 +752,6 @@ const state = {
 };
 
 // ══════════════════════════════════════════════════════
-// LOGIN
-// ══════════════════════════════════════════════════════
-function selectRole(el, role) {
-  document.querySelectorAll('.role-opt').forEach(o => o.classList.remove('selected'));
-  el.classList.add('selected');
-  state.role = role;
-}
-
-function doLogin() {
-  const user = document.getElementById('login-user').value.trim();
-  const pass = document.getElementById('login-pass').value;
-  const err  = document.getElementById('login-error');
-
-  if (!user || !pass) {
-    err.textContent = 'Ingrese usuario y contraseña.';
-    return;
-  }
-  // Autenticación simulada — reemplazar con fetch() al endpoint real
-  state.user = user;
-  err.textContent = '';
-  document.getElementById('view-login').style.display = 'none';
-  document.getElementById('view-app').classList.add('active');
-
-  const initials = user.split('@')[0].slice(0,2).toUpperCase();
-  document.getElementById('user-avatar').textContent = initials;
-  document.getElementById('user-name').textContent   = user.split('@')[0];
-  document.getElementById('user-role').textContent   = state.role;
-
-  if (state.role === 'administrador') {
-    document.getElementById('nav-history').classList.remove('hidden');
-  }
-  showPage('upload');
-}
-
-function doLogout() {
-  clearTimers();
-  document.getElementById('view-app').classList.remove('active');
-  document.getElementById('view-login').style.display = 'flex';
-  document.getElementById('login-user').value = '';
-  document.getElementById('login-pass').value = '';
-  state.user = null; state.selectedFile = null; state.currentJobId = null;
-}
-
-// ══════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ══════════════════════════════════════════════════════
 function showPage(name) {
@@ -836,12 +759,11 @@ function showPage(name) {
   const el = document.getElementById('page-' + name);
   if (el) el.classList.add('active');
 
-  ['upload','mis','history'].forEach(n => {
+  ['upload','history'].forEach(n => {
     const btn = document.getElementById('nav-' + n);
     if (btn) btn.classList.toggle('active', n === name);
   });
 
-  if (name === 'mis')     loadMisAnalisis();
   if (name === 'history') loadHistorial();
 }
 
@@ -909,7 +831,6 @@ async function iniciarAnalisis() {
     formData.append('presentador',     presentador);
     formData.append('tipo',            tipo);
     formData.append('dependencia',     dep);
-    formData.append('analista_id',     state.user || '');
 
     const res  = await fetch(`${API_BASE}/analyze/upload`, { method: 'POST', body: formData });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
@@ -1061,8 +982,9 @@ function renderResultado(result, container) {
   const sent   = kpis.sentiment || {};
   const clar   = kpis.clarity || {};
   const audio  = kpis.audio || {};
-  const posture= kpis.posture || {};
-  const struct = clar.structure || {};
+  const posture  = kpis.posture  || {};
+  const objects  = kpis.objects  || {};
+  const struct   = clar.structure || {};
   const tags   = buildTags(interp);
   const narrativa = fb.narrativa || '—';
 
@@ -1134,6 +1056,8 @@ function renderResultado(result, container) {
       <div class="tl-li"><div class="tl-dot" style="background:#A855F7"></div>Gesto<div class="legend-tip">Frame donde se detectó mano levantada o brazos abiertos.</div></div>
     </div>
   </div>
+
+  ${buildObjectsSection(objects)}
 
   <div class="section-label">Métricas detalladas</div>
   <div class="metrics-grid">
@@ -1295,6 +1219,144 @@ function gestureBar(label, ratio, color) {
   </div>`;
 }
 
+// ══════════════════════════════════════════════════════
+// OBJETOS DETECTADOS — HELPERS
+// ══════════════════════════════════════════════════════
+const OBJ_CAT_COLOR = {
+  'Tecnología educativa': '#6366F1',
+  'Recursos didácticos':  '#C8102E',
+  'Mobiliario':           '#D97706',
+  'Personas':             '#16A34A',
+};
+
+function objectCategoryColor(cat) {
+  return OBJ_CAT_COLOR[cat] || '#6B7280';
+}
+
+function buildObjectsSection(objects) {
+  if (!objects || objects.error || !objects.objetos_unicos) {
+    return '';   // sin datos → no mostrar la sección
+  }
+
+  const objs   = objects.objetos   || [];
+  const dist   = objects.distribucion_categoria || {};
+  const dur    = objects.duracion_segundos || 1;
+  const maxPres = Math.max(...objs.map(o => o.presencia_segundos), 1);
+
+  // "personas.presencia_segundos" es una suma de personas simultáneas por segundo
+  // (persona-segundos), NO tiempo real de duración — puede superar la duración del
+  // video si hay varias personas a la vez. Para el KPI de tiempo usamos el conteo
+  // de segundos con al menos 1 persona detectada (personas_por_segundo), con un
+  // respaldo acotado a la duración real del video si ese arreglo no está disponible.
+  const personasPorSeg = objects.personas_por_segundo || [];
+  const presenciaSegundosReal = personasPorSeg.length
+    ? personasPorSeg.filter(n => n > 0).length
+    : Math.min(objects.personas?.presencia_segundos || 0, dur);
+  const presenciaPct = Math.round((presenciaSegundosReal / dur) * 100);
+
+  // ── Resumen KPIs
+  const kpisHtml = `
+    <div class="obj-resumen">
+      <div class="obj-kpi">
+        <div class="obj-kpi-val">${objects.objetos_unicos}</div>
+        <div class="obj-kpi-name">Tipos de objetos</div>
+      </div>
+      <div class="obj-kpi">
+        <div class="obj-kpi-val">${objects.personas?.max_simultaneo || 0}</div>
+        <div class="obj-kpi-name">Personas máx. simultáneas</div>
+      </div>
+      <div class="obj-kpi">
+        <div class="obj-kpi-val">${fmtTime(Math.round(presenciaSegundosReal))}</div>
+        <div class="obj-kpi-name">Actividad en el aula <span style="color:var(--texto-3)">(${presenciaPct}% del video)</span></div>
+      </div>
+      <div class="obj-kpi">
+        <div class="obj-kpi-val">${Object.keys(dist).length}</div>
+        <div class="obj-kpi-name">Categorías detectadas</div>
+      </div>
+    </div>`;
+
+  // ── Tabla de objetos
+  const rowsHtml = objs.map(o => {
+    const color    = objectCategoryColor(o.categoria);
+    const barPct   = Math.round((o.presencia_segundos / maxPres) * 100);
+    const conf     = o.confianza_promedio != null ? (o.confianza_promedio * 100).toFixed(0) + '%' : '—';
+    const primera  = o.primera_aparicion  != null ? fmtTime(Math.round(o.primera_aparicion))  : '—';
+    const ultima   = o.ultima_aparicion   != null ? fmtTime(Math.round(o.ultima_aparicion))   : '—';
+    return `<tr>
+      <td>
+        <span class="obj-cat-dot" style="background:${color}"></span>
+        <span style="font-weight:500">${o.label}</span>
+        <div style="font-size:10px;color:var(--texto-3);margin-top:1px;margin-left:15px">${o.categoria}</div>
+      </td>
+      <td>
+        <div class="obj-pres-bar">
+          <div class="obj-pres-track">
+            <div class="obj-pres-fill" style="width:${barPct}%;background:${color}"></div>
+          </div>
+          <span>${fmtTime(Math.round(o.presencia_segundos))}</span>
+        </div>
+      </td>
+      <td>${conf}</td>
+      <td>${o.max_simultaneo}</td>
+      <td>${primera}</td>
+      <td>${ultima}</td>
+    </tr>`;
+  }).join('');
+
+  const tableHtml = objs.length
+    ? `<div style="overflow-x:auto">
+        <table class="obj-table">
+          <thead><tr>
+            <th>Elemento detectado</th>
+            <th>Presencia</th>
+            <th>Confianza</th>
+            <th>Máx. simult.</th>
+            <th>1ª aparición</th>
+            <th>Últ. aparición</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`
+    : `<div class="obj-empty">No se detectaron elementos educativos en el video.</div>`;
+
+  // ── Distribución por categoría
+  const distSorted = Object.entries(dist).sort((a, b) => b[1] - a[1]);
+
+  const distStackHtml = distSorted.map(([cat, pctVal]) => {
+    const color = objectCategoryColor(cat);
+    return `<div class="obj-dist-seg" style="width:${pctVal}%;background:${color}" title="${cat}: ${pctVal.toFixed(1)}%"></div>`;
+  }).join('');
+
+  const distHtml = distSorted.map(([cat, pctVal]) => {
+    const color = objectCategoryColor(cat);
+    return `<div class="obj-dist-row">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--texto-2);display:flex;align-items:center">
+          <span class="obj-cat-dot" style="background:${color}"></span>${cat}
+        </span>
+        <span style="font-size:11px;font-weight:500;color:var(--texto)">${pctVal.toFixed(1)}%</span>
+      </div>
+      <div class="obj-dist-bar-wrap">
+        <div class="obj-dist-track">
+          <div class="obj-dist-fill" style="width:${pctVal}%;background:${color}"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="section-label">Elementos del aula detectados</div>
+  <div class="card">
+    ${kpisHtml}
+    ${tableHtml}
+    ${distSorted.length ? `<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--borde)">
+      <div class="obj-dist-title">Distribución por categoría</div>
+      <div class="obj-dist-stack">${distStackHtml}</div>
+      <div class="obj-dist-legend">${distHtml}</div>
+    </div>` : ''}
+  </div>`;
+}
+
 function buildTags(interp) {
   return Object.entries(interp).map(([k,v]) => {
     const nivel = v.nivel || '';
@@ -1306,6 +1368,7 @@ function buildTags(interp) {
       clarity:     'Claridad',
       audio:       'Expresividad',
       posture:     'Postura',
+      objects:     'Elementos aula',
     };
     if (nivel === 'no_disponible') return '';
     return `<span class="badge ${cls}">${names[k]||k}: ${nivel}</span>`;
@@ -1335,7 +1398,6 @@ function saveToLocalHistory() {
     tipo:        document.getElementById('inp-tipo').value,
     dep:         document.getElementById('inp-dep').value || '—',
     filename:    state.selectedFile?.name || '—',
-    analista:    state.user || '—',
     fecha:       new Date().toLocaleDateString('es-PE',{day:'numeric',month:'short',year:'numeric'}),
     score:       state.currentResult?.feedback?.score_global || 0,
     result:      state.currentResult,
@@ -1345,64 +1407,6 @@ function saveToLocalHistory() {
   localStorage.setItem('kpi_history', JSON.stringify(hist.slice(0, 50)));
 }
 
-async function loadMisAnalisis() {
-  const body = document.getElementById('mis-body');
-  body.innerHTML = `<div style="text-align:center;padding:24px;color:var(--texto-3);font-size:13px">Cargando...</div>`;
-
-  try {
-    const analista = encodeURIComponent(state.user || '');
-    const res  = await fetch(`${API_BASE}/analyze?analista_id=${analista}`);
-    const jobs = await res.json();
-
-    if (!jobs.length) {
-      body.innerHTML = `<div style="text-align:center;padding:32px 0;color:var(--texto-3);font-size:13px">Aún no has realizado ningún análisis.</div>`;
-      return;
-    }
-
-    const rows = jobs.map(j => {
-      const score    = j.score != null ? Number(j.score).toFixed(1) : '—';
-      const scoreClass = j.score >= 8 ? 'badge-green' : j.score >= 6 ? 'badge-amber' : 'badge-red';
-      const fecha    = j.created_at ? new Date(j.created_at).toLocaleDateString('es-PE', {day:'numeric',month:'short',year:'numeric'}) : '—';
-      const nombre   = j.nombre_analisis || j.filename;
-      const presentador = j.presentador || '—';
-
-      return `<tr>
-        <td>
-          <div style="font-weight:500;color:var(--texto)">${nombre}</div>
-          <div style="font-size:11px;color:var(--texto-3);margin-top:1px">${j.filename}</div>
-        </td>
-        <td style="color:var(--texto-2)">${presentador}</td>
-        <td style="color:var(--texto-2)">${j.tipo || '—'}</td>
-        <td style="color:var(--texto-2)">${fecha}</td>
-        <td style="text-align:right">
-          ${j.status === 'done'
-            ? `<span class="badge ${scoreClass}">${score}</span>`
-            : `<span class="badge badge-gray">${j.status}</span>`}
-        </td>
-        <td style="text-align:right">
-          ${j.status === 'done'
-            ? `<button class="btn-sm" onclick="verJobPorId('${j.job_id}')">Ver</button>`
-            : `<button class="btn-sm" disabled style="opacity:.4">Ver</button>`}
-        </td>
-      </tr>`;
-    }).join('');
-
-    body.innerHTML = `<table class="hist-table">
-      <thead><tr>
-        <th>Nombre del análisis</th>
-        <th>Presentador</th>
-        <th>Tipo</th>
-        <th>Fecha</th>
-        <th style="text-align:right">Score</th>
-        <th style="text-align:right">Acción</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-
-  } catch (e) {
-    body.innerHTML = `<div style="text-align:center;padding:32px 0;color:var(--rojo);font-size:13px">Error al cargar los análisis.</div>`;
-  }
-}
 
 async function verJobPorId(jobId) {
   try {
