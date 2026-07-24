@@ -47,7 +47,7 @@ El sistema procesa un video y devuelve un resultado estructurado con:
 
 Antes de levantar el servicio, necesitas tener instalado:
 
-- Python 3.10+ (se recomienda 3.11)
+- Python 3.10+ (se recomienda 3.12)
 - ffmpeg y ffprobe disponibles en PATH
 - PostgreSQL (o ajustar DATABASE_URL a una base compatible)
 - Dependencias de Python listadas en requirements.txt
