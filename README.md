@@ -1,6 +1,25 @@
 # Video KPI Analyzer
 
-Video KPI Analyzer es un servicio web para procesar videos, extraer métricas de discurso y devolver un resultado estructurado con transcripción, KPIs y feedback. El flujo actual incluye análisis de audio, postura, gestos y detección de objetos educativos.
+Video KPI Analyzer es una aplicación web para evaluar presentaciones, clases, reuniones u otros videos en los que una persona habla frente a una audiencia. El sistema transforma un video de entrada en un informe estructurado con la transcripción, métricas cuantitativas del discurso, indicadores de calidad de audio, señales de comunicación no verbal y recomendaciones de mejora.
+
+La aplicación está construida alrededor de una API FastAPI y un frontend estático incluido en el repositorio. Cada video se registra como un job de análisis: la API recibe el archivo y sus datos descriptivos, responde con un identificador y ejecuta el procesamiento en segundo plano. Esto permite consultar el estado mientras se ejecutan modelos de transcripción y visión por computadora, y recuperar posteriormente el resultado completo o un resumen preparado para consumo del frontend.
+
+El análisis combina varias fuentes de información. El audio se extrae y se normaliza con FFmpeg; después se divide en fragmentos para transcribirlo con Whisper. A partir de la transcripción se calculan el tiempo de habla, el ritmo, la claridad y el sentimiento. En paralelo, se revisan características acústicas, postura y gestos mediante MediaPipe, y se detectan objetos presentes en los fotogramas con YOLO. Finalmente, los indicadores se integran en un feedback general que ayuda a interpretar el desempeño del presentador.
+
+Además del análisis, el servicio incluye autenticación mediante JWT, gestión de usuarios y persistencia de jobs y resultados en PostgreSQL a través de SQLAlchemy. También calcula una huella del archivo para identificar si el mismo video ya fue procesado por un analista, evitando repetir trabajos completados.
+
+## Objetivo y alcance
+
+El proyecto sirve como base para convertir observaciones subjetivas sobre una presentación en señales medibles y comparables. No pretende sustituir la evaluación humana: sus resultados son indicadores automáticos que deben interpretarse junto con el contexto, el contenido de la presentación y los objetivos de cada análisis.
+
+El resultado de un análisis incluye:
+
+- La duración del video y el total de palabras detectadas
+- La transcripción completa del discurso
+- KPIs separados de tiempo de habla, ritmo, sentimiento, claridad y audio
+- Indicadores de postura, gestos y objetos detectados en el video
+- Feedback consolidado a partir de los KPIs de discurso y audio
+- El estado del job y, cuando corresponde, el mensaje de error del procesamiento
 
 ## Qué incluye el proyecto
 
@@ -19,7 +38,6 @@ El pipeline actual realiza lo siguiente:
   - detección de objetos visuales
 - Generación de feedback interpretativo
 - Persistencia de jobs y resultados en base de datos
-
 ## Estructura del proyecto
 
 ```text
@@ -45,8 +63,26 @@ El pipeline actual realiza lo siguiente:
 └── test.py                 # Utilidades de ejemplo/pruebas
 ```
 
-## Requisitos previos
+### Descripción de las carpetas
 
+- `video/`: almacena los videos de entrada disponibles para análisis. Se utiliza tanto para los archivos incluidos previamente como para los videos recibidos mediante el endpoint de carga.
+- `temp/`: contiene los archivos intermedios creados durante el procesamiento, como el audio WAV extraído, los fragmentos de audio y los fotogramas usados por el análisis visual. Estos archivos se eliminan al finalizar el pipeline cuando el proceso termina correctamente o con error.
+- `services/`: agrupa la lógica especializada de cada indicador. Cada subcarpeta mantiene un analizador independiente para que el pipeline principal pueda coordinar los pasos sin mezclar sus responsabilidades:
+  - `services/clarity/`: calcula indicadores relacionados con la claridad del discurso a partir de las palabras y la transcripción.
+  - `services/feedback/`: combina los KPIs de discurso y audio para generar una interpretación y recomendaciones generales.
+  - `services/rhythm/`: analiza el ritmo del habla y contiene también el análisis de características acústicas.
+  - `services/sentiment/`: estima el sentimiento o tono general del discurso usando la transcripción y la información temporal de las palabras.
+  - `services/speech_time/`: calcula métricas sobre el tiempo hablado y su relación con la duración total del video.
+  - `services/transcription/`: extrae la duración, transcribe el audio con Whisper y normaliza los segmentos y palabras reconocidos.
+  - `services/video/`: procesa la parte visual del video; analiza postura y gestos con MediaPipe y detecta objetos mediante YOLO.
+- `shared/`: reúne componentes compartidos por la API y el pipeline, sin pertenecer a un KPI concreto:
+  - `shared/database.py`: crea el motor, la sesión y la base declarativa de SQLAlchemy.
+  - `shared/models.py`: define las entidades persistidas, principalmente usuarios y trabajos de análisis.
+  - `shared/schemas.py`: contiene esquemas auxiliares para validar o estructurar datos intercambiados por la aplicación.
+
+Los archivos de la raíz cumplen funciones de coordinación: `main.py` expone la API y administra los jobs, `core.py` ejecuta el pipeline completo, `index.html` proporciona la interfaz web y `requirements.txt` fija las dependencias del proyecto.
+
+## Requisitos previos
 - Python 3.10 o superior
 - ffmpeg y ffprobe disponibles en PATH
 - PostgreSQL en ejecución o una URL de base de datos accesible
