@@ -36,31 +36,39 @@ El pipeline actual realiza lo siguiente:
   - calidad de audio
   - postura y gestos
   - detección de objetos visuales
+  - información técnica del video
+- Evaluación docente integral con rúbrica pedagógica y resumen ejecutivo
 - Generación de feedback interpretativo
 - Persistencia de jobs y resultados en base de datos
+- Integración opcional con LLM para evaluación de contenido pedagógico y resumen ejecutivo
+
 ## Estructura del proyecto
 
 ```text
 .
-├── main.py                 # API FastAPI, autenticación y endpoints
-├── core.py                 # Pipeline principal de análisis
+├── main.py                 # API FastAPI, gestión de jobs y endpoints principales
+├── core.py                 # Pipeline principal del análisis de video
 ├── index.html              # Frontend estático servido por la API
 ├── requirements.txt        # Dependencias Python
 ├── video/                  # Videos disponibles para análisis
 ├── temp/                   # Archivos temporales generados durante el proceso
 ├── services/
-│   ├── clarity/            # Análisis de claridad
-│   ├── feedback/           # Generación de feedback
-│   ├── rhythm/             # Ritmo y métrica del discurso
-│   ├── sentiment/          # Análisis de sentimiento
-│   ├── speech_time/        # Tiempo de habla
-│   ├── transcription/      # Transcripción con Whisper
-│   └── video/              # Postura, gestos y detección de objetos
+│   ├── clarity/            # Análisis de claridad del discurso
+│   ├── evaluacion/         # Evaluación docente, rúbrica y resumen ejecutivo
+│   ├── feedback/           # Interpretación y consolidación de indicadores
+│   ├── llm/                # Clientes LLM para OpenAI / Azure / Anthropic / Gemini
+│   ├── rhythm/             # Ritmo y métricas de audio/discurso
+│   ├── sentiment/          # Análisis de sentimiento y tono emocional
+│   ├── speech_time/        # Tiempo de habla y proporción de habla
+│   ├── transcription/      # Transcripción con Whisper y gestión de chunks
+│   └── video/              # Información del video, postura, gestos y detección con YOLO
 ├── shared/
 │   ├── database.py         # Configuración SQLAlchemy
 │   ├── models.py           # Modelos de usuario y jobs
 │   └── schemas.py          # Esquemas auxiliares
-└── test.py                 # Utilidades de ejemplo/pruebas
+├── test.py                 # Utilidades de ejemplo/pruebas
+├── test_objects.py         # Pruebas y utilidades de detección de objetos
+└── README.md               # Documentación del proyecto
 ```
 
 ### Descripción de las carpetas
@@ -69,18 +77,20 @@ El pipeline actual realiza lo siguiente:
 - `temp/`: contiene los archivos intermedios creados durante el procesamiento, como el audio WAV extraído, los fragmentos de audio y los fotogramas usados por el análisis visual. Estos archivos se eliminan al finalizar el pipeline cuando el proceso termina correctamente o con error.
 - `services/`: agrupa la lógica especializada de cada indicador. Cada subcarpeta mantiene un analizador independiente para que el pipeline principal pueda coordinar los pasos sin mezclar sus responsabilidades:
   - `services/clarity/`: calcula indicadores relacionados con la claridad del discurso a partir de las palabras y la transcripción.
+  - `services/evaluacion/`: evalúa la calidad docente con una rúbrica pedagógica, pondera contenido y forma, y genera un resumen ejecutivo a partir de la evidencia del video y la transcripción.
   - `services/feedback/`: combina los KPIs de discurso y audio para generar una interpretación y recomendaciones generales.
+  - `services/llm/`: encapsula la integración con proveedores LLM para producir una evaluación más rica y un resumen ejecutivo cuando hay configuración activa.
   - `services/rhythm/`: analiza el ritmo del habla y contiene también el análisis de características acústicas.
   - `services/sentiment/`: estima el sentimiento o tono general del discurso usando la transcripción y la información temporal de las palabras.
   - `services/speech_time/`: calcula métricas sobre el tiempo hablado y su relación con la duración total del video.
   - `services/transcription/`: extrae la duración, transcribe el audio con Whisper y normaliza los segmentos y palabras reconocidos.
-  - `services/video/`: procesa la parte visual del video; analiza postura y gestos con MediaPipe y detecta objetos mediante YOLO.
+  - `services/video/`: procesa la parte visual del video; analiza información técnica, postura, gestos con MediaPipe y detecta objetos mediante YOLO.
 - `shared/`: reúne componentes compartidos por la API y el pipeline, sin pertenecer a un KPI concreto:
   - `shared/database.py`: crea el motor, la sesión y la base declarativa de SQLAlchemy.
   - `shared/models.py`: define las entidades persistidas, principalmente usuarios y trabajos de análisis.
   - `shared/schemas.py`: contiene esquemas auxiliares para validar o estructurar datos intercambiados por la aplicación.
 
-Los archivos de la raíz cumplen funciones de coordinación: `main.py` expone la API y administra los jobs, `core.py` ejecuta el pipeline completo, `index.html` proporciona la interfaz web y `requirements.txt` fija las dependencias del proyecto.
+Los archivos de la raíz cumplen funciones de coordinación: `main.py` expone la API y administra los jobs, `core.py` ejecuta el pipeline completo, `index.html` proporciona la interfaz web, `requirements.txt` fija las dependencias del proyecto y `test.py` / `test_objects.py` sirven de referencia para pruebas y utilidades de diagnóstico.
 
 ## Requisitos previos
 - Python 3.10 o superior
@@ -141,6 +151,10 @@ YOLO_CONF=0.35
 YOLO_FRAME_SKIP=2
 LLM_PROVIDER=none
 LLM_API_KEY=
+AZURE_OPENAI_ENDPOINT=
+AZURE_OPENAI_API_KEY=
+AZURE_OPENAI_API_VERSION=2024-08-01-preview
+AZURE_OPENAI_DEPLOYMENT=
 ```
 
 ### Descripción de las variables
@@ -153,7 +167,9 @@ LLM_API_KEY=
 - CHUNK_SECONDS: duración de cada fragmento de audio
 - WHISPER_MODEL: tamaño del modelo de transcripción
 - YOLO_MODEL / YOLO_CONF / YOLO_FRAME_SKIP: configuración para detección de objetos
-- LLM_PROVIDER / LLM_API_KEY: integración opcional para feedback con modelo externo
+- LLM_PROVIDER: proveedor activo para la evaluación docente con LLM (`none`, `openai`, `azure`, `anthropic`, `gemini`)
+- LLM_API_KEY: clave del proveedor seleccionado
+- AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_API_VERSION / AZURE_OPENAI_DEPLOYMENT: configuración específica para Azure OpenAI
 
 ## Levantar el servicio
 
@@ -229,21 +245,25 @@ curl "http://localhost:8000/analyze/<job_id>/result"
 
 El flujo interno del análisis sigue este orden:
 
-1. Se extrae el audio del video
-2. Se divide en fragmentos para transcripción
-3. Se transcribe el contenido con Whisper
-4. Se calculan KPIs de speech time, rhythm, sentiment, clarity y audio
-5. Se analiza postura y gestos con MediaPipe Pose
-6. Se detectan objetos relevantes con YOLO
-7. Se construye un feedback general
-8. Se guarda el resultado y el estado del job en la base de datos
+1. Se obtiene la información técnica del video
+2. Se extrae el audio del video
+3. Se divide en fragmentos para transcripción
+4. Se transcribe el contenido con Whisper
+5. Se calculan KPIs de speech time, rhythm, sentiment, clarity y audio
+6. Se analiza postura y gestos con MediaPipe Pose
+7. Se detectan objetos relevantes con YOLO
+8. Se construye una evaluación docente con rúbrica y resumen ejecutivo usando el proveedor LLM configurado
+9. Se guarda el resultado y el estado del job en la base de datos
+
+El resultado final incluye además de los KPIs, un campo `evaluacion` con `score_final`, `score_rubrica`, `score_oratoria`, `criterios` y `resumen_ejecutivo` para un análisis más completo de la presentación.
 
 ## Base de datos
 
-Al iniciar la aplicación, SQLAlchemy crea automáticamente las tablas necesarias. Los modelos principales son:
+Al iniciar la aplicación, SQLAlchemy crea automáticamente las tablas necesarias. El modelo principal es:
 
-- AnalysisJob: representa cada trabajo de análisis
-- User: representa los usuarios del sistema
+- AnalysisJob: representa cada trabajo de análisis, guarda el estado, el resultado, la ruta del video, los metadatos del análisis y el hash del archivo para evitar duplicados.
+
+La API actual del repositorio se centra en la gestión de jobs de análisis y el resultado del procesamiento; la parte de autenticación mencionada en otros documentos no es el flujo activo en este código base.
 
 ## Notas importantes
 
