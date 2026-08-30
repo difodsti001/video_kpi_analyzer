@@ -15,8 +15,8 @@ from services.rhythm.analyzer        import analyze_rhythm
 from services.rhythm.audio_analyzer  import analyze_audio
 from services.sentiment.analyzer     import analyze_sentiment
 from services.clarity.analyzer       import analyze_clarity
-from services.feedback.analyzer      import analyze_feedback
-from services.video.analyzer import analyze_posture, analyze_objects
+from services.video.analyzer import analyze_posture, analyze_objects, get_video_info
+from services.evaluacion.analyzer    import evaluar_docente
 
 TEMP_FOLDER = os.getenv("TEMP_FOLDER", "./temp")
 os.makedirs(TEMP_FOLDER, exist_ok=True)
@@ -55,9 +55,10 @@ class VideoAnalyzer:
         self.sentiment = {}
         self.clarity  = {}
         self.audio    = {}
-        self.feedback = {}
         self.posture = {}
-        self.objects   = {} 
+        self.objects   = {}
+        self.evaluacion = {}
+        self.video_info = {}
 
     # ── audio ────────────────────────────────────────────────────
 
@@ -126,12 +127,16 @@ class VideoAnalyzer:
         self.audio = analyze_audio(self.wav_path)
         return self.audio
 
-    def run_feedback(self) -> dict:
-        self.feedback = analyze_feedback(
-            self.speech, self.rhythm, self.sentiment,
-            self.clarity, self.audio
+    def run_evaluacion(self) -> dict:
+        self.evaluacion = evaluar_docente(
+            self.transcript, self.speech, self.rhythm, self.sentiment,
+            self.clarity, self.audio, self.objects
         )
-        return self.feedback
+        return self.evaluacion
+
+    def run_video_info(self) -> dict:
+        self.video_info = get_video_info(self.video_path)
+        return self.video_info
 
     def run_posture(self) -> dict:
         frames_folder = os.path.join(TEMP_FOLDER, f"frames_{uuid.uuid4().hex[:8]}")
@@ -158,6 +163,7 @@ class VideoAnalyzer:
 
     def run(self) -> dict:
         try:
+            self.run_video_info()
             self.extract_audio()
             self.split_audio()
             self.transcribe()
@@ -167,8 +173,8 @@ class VideoAnalyzer:
             self.run_clarity()
             self.run_audio()
             self.run_posture()
-            self.run_objects() 
-            self.run_feedback()
+            self.run_objects()
+            self.run_evaluacion()
         finally:
             self.cleanup()
 
@@ -179,6 +185,7 @@ class VideoAnalyzer:
             "duration_seconds": self.duration,
             "total_words":      len(self.all_words),
             "transcript":       self.transcript,
+            "video_info":       self.video_info,
             "kpis": {
                 "speech_time": self.speech,
                 "rhythm":      self.rhythm,
@@ -188,6 +195,6 @@ class VideoAnalyzer:
                 "posture": self.posture,
                 "objects":     self.objects,
             },
-            "feedback": self.feedback,
+            "evaluacion": self.evaluacion,
         }
         return _serialize(raw)

@@ -1,39 +1,49 @@
-from transformers import pipeline
+from pysentimiento import create_analyzer
 
-_sentiment_pipeline = None
+_sentiment_analyzer = None
 
-def get_pipeline():
-    global _sentiment_pipeline
-    if _sentiment_pipeline is None:
-        _sentiment_pipeline = pipeline(
-            "sentiment-analysis",
-            model="nlptown/bert-base-multilingual-uncased-sentiment"
-        )
-    return _sentiment_pipeline
+_LABEL_MAP = {"POS": "positive", "NEG": "negative", "NEU": "neutral"}
+
+
+def get_analyzer():
+    global _sentiment_analyzer
+    if _sentiment_analyzer is None:
+        _sentiment_analyzer = create_analyzer(task="sentiment", lang="es")
+    return _sentiment_analyzer
+
+
+def _predict(analyzer, text: str) -> tuple[float, str]:
+    """Devuelve (score -1..1, label positive/negative/neutral) para un texto."""
+    result = analyzer.predict(text[:512])
+    probas = result.probas
+    score  = round(probas.get("POS", 0.0) - probas.get("NEG", 0.0), 3)
+    label  = _LABEL_MAP.get(result.output, "neutral")
+    return score, label
+
 
 def analyze_sentiment(transcript: str, words: list[dict]) -> dict:
     """
-    Analiza sentimiento del transcript por segmentos.
+    Analiza sentimiento del transcript por segmentos usando un modelo entrenado
+    en español (pysentimiento/robertuito-sentiment-analysis), con salida directa
+    positive/negative/neutral en vez de inferirlo de un rating de estrellas.
     Devuelve score general y evolución a lo largo del video.
     """
     if not transcript or not words:
         return {}
 
-    nlp = get_pipeline()
-    total_duration = words[-1]["end"] - words[0]["start"]
+    analyzer = get_analyzer()
 
     # dividir transcript en segmentos de ~200 caracteres
-    # (límite del modelo)
+    # (evita textos demasiado largos por inferencia)
     segments = _split_text(transcript, max_chars=200)
 
     scores = []
+    labels = []
     for seg in segments:
         try:
-            result = nlp(seg[:512])[0]
-            # modelo devuelve 1-5 estrellas → convertir a -1.0/1.0
-            stars = int(result["label"][0])
-            score = round((stars - 3) / 2, 3)   # 1★=-1.0, 3★=0.0, 5★=1.0
+            score, label = _predict(analyzer, seg)
             scores.append(score)
+            labels.append(label)
         except Exception:
             continue
 
@@ -43,15 +53,16 @@ def analyze_sentiment(transcript: str, words: list[dict]) -> dict:
     avg_score = round(sum(scores) / len(scores), 3)
 
     # timeline: sentimiento por cada 60s del video
-    timeline = _sentiment_timeline(words, nlp, window=60)
+    timeline = _sentiment_timeline(words, analyzer, window=60)
 
+    total = len(labels)
     return {
         "overall_score": avg_score,
         "label":         _score_to_label(avg_score),
-        "segments_analyzed": len(scores),
-        "positive_ratio": round(sum(1 for s in scores if s > 0.2) / len(scores), 3),
-        "negative_ratio": round(sum(1 for s in scores if s < -0.2) / len(scores), 3),
-        "neutral_ratio":  round(sum(1 for s in scores if -0.2 <= s <= 0.2) / len(scores), 3),
+        "segments_analyzed": total,
+        "positive_ratio": round(labels.count("positive") / total, 3),
+        "negative_ratio": round(labels.count("negative") / total, 3),
+        "neutral_ratio":  round(labels.count("neutral")  / total, 3),
         "timeline":       timeline,
     }
 
@@ -78,7 +89,7 @@ def _split_text(text: str, max_chars: int = 200) -> list[str]:
     return chunks
 
 
-def _sentiment_timeline(words: list[dict], nlp, window: int = 60) -> list[dict]:
+def _sentiment_timeline(words: list[dict], analyzer, window: int = 60) -> list[dict]:
     """Sentimiento por ventana de tiempo."""
     if not words:
         return []
@@ -93,11 +104,8 @@ def _sentiment_timeline(words: list[dict], nlp, window: int = 60) -> list[dict]:
         text = " ".join(bucket_words)
         if text.strip():
             try:
-                result = nlp(text[:512])[0]
-                stars  = int(result["label"][0])
-                score  = round((stars - 3) / 2, 3)
-                timeline.append({"second": round(t), "score": score,
-                                  "label": _score_to_label(score)})
+                score, label = _predict(analyzer, text)
+                timeline.append({"second": round(t), "score": score, "label": label})
             except Exception:
                 pass
         t += window

@@ -14,7 +14,11 @@ mp_pose     = mp.solutions.pose
 
 YOLO_MODEL      = os.getenv("YOLO_MODEL", "yolo26n.pt")
 YOLO_CONF       = float(os.getenv("YOLO_CONF", "0.35"))
-YOLO_FRAME_SKIP = int(os.getenv("YOLO_FRAME_SKIP", "2"))
+
+# Frames por segundo REAL a los que se muestrea el video para YOLO.
+# Se mantiene igual a la tasa de MediaPipe (1 fps, ver extract_frames) para que
+# ambos análisis (postura y objetos) queden alineados sobre la misma línea de tiempo.
+YOLO_SAMPLE_FPS = float(os.getenv("YOLO_SAMPLE_FPS", "1"))
 
 OBJECT_CLASS_MAP: dict[int, dict] = {
     61: {"label": "Pizarra / Pantalla",    "categoria": "Recursos didácticos"},
@@ -29,6 +33,73 @@ OBJECT_CLASS_MAP: dict[int, dict] = {
     67: {"label": "Proyector / Microondas","categoria": "Tecnología educativa"},
     0:  {"label": "Persona",               "categoria": "Personas"},
 }
+
+# Categoría institucional por NOMBRE de clase (no por ID) para el modelo custom
+# (.onnx). Los nombres de clase se leen directamente de la metadata embebida en
+# el propio modelo (model.names) en vez de mantener un mapa de IDs a mano — un
+# mapa por ID se desincroniza fácilmente si el modelo se reentrena/reexporta
+# con otro orden de clases (fue justamente el bug que causaba "Celular" sobre
+# personas: el ID 2 del modelo real es "Persona", no "Celular").
+CATEGORIA_POR_LABEL: dict[str, str] = {
+    "Persona":                  "Personas",
+    "Pizarra":                  "Recursos didácticos",
+    "Celular":                  "Tecnología educativa",
+    "Proyector / Pantalla":     "Tecnología educativa",
+    "Mesa":                     "Mobiliario",
+    "Silla":                    "Mobiliario",
+    "Computadora / Laptop":     "Tecnología educativa",
+    "Puntero físico":           "Recursos didácticos",
+    "Marcador / Tiza / Plumón": "Recursos didácticos",
+    "Mota / Borrador":          "Recursos didácticos",
+}
+
+def _es_modelo_custom() -> bool:
+    return YOLO_MODEL.lower().endswith(".onnx")
+
+#------------------------------------------------------------
+# Ficha técnica del archivo de video
+#------------------------------------------------------------
+
+def _calidad_label(height: int) -> str:
+    if height >= 2160:
+        return "4K"
+    if height >= 1080:
+        return "Full HD"
+    if height >= 720:
+        return "HD"
+    if height >= 480:
+        return "SD"
+    return "Baja resolución"
+
+
+def get_video_info(video_path: str) -> dict:
+    """Metadata básica del archivo: duración, resolución/calidad, fps y peso."""
+    size_bytes = os.path.getsize(video_path) if os.path.exists(video_path) else 0
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return {
+            "error": f"No se pudo abrir el video: {video_path}",
+            "tamano_mb": round(size_bytes / (1024 * 1024), 2),
+        }
+
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps    = cap.get(cv2.CAP_PROP_FPS) or 0.0
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duracion_segundos = round(total_frames / fps, 2) if fps else 0.0
+    cap.release()
+
+    return {
+        "ancho":             width,
+        "alto":              height,
+        "resolucion":        f"{width}x{height}",
+        "calidad":           _calidad_label(height),
+        "fps":               round(fps, 2),
+        "duracion_segundos": duracion_segundos,
+        "tamano_mb":         round(size_bytes / (1024 * 1024), 2),
+    }
+
 
 #------------------------------------------------------------
 # Sección de análisis de postura y gestos con MediaPipe Pose
@@ -264,7 +335,7 @@ def _load_yolo():
     y evitar el import al nivel de módulo (pesa ~200ms).
     """
     from ultralytics import YOLO
-    return YOLO(YOLO_MODEL)
+    return YOLO(YOLO_MODEL, task="detect")
  
  
 def detect_objects_in_frame(model, frame: np.ndarray, conf: float = YOLO_CONF) -> list[dict]:
@@ -281,25 +352,33 @@ def detect_objects_in_frame(model, frame: np.ndarray, conf: float = YOLO_CONF) -
         Lista de dicts con keys: label, categoria, confianza, bbox.
         bbox = [x1, y1, x2, y2] en píxeles (int).
     """
-    results = model(frame, conf=conf, verbose=False)
+    results    = model(frame, conf=conf, verbose=False)
+    es_custom  = _es_modelo_custom()
     detections = []
- 
+
     for box in results[0].boxes:
-        cls_id   = int(box.cls[0])
-        info     = OBJECT_CLASS_MAP.get(cls_id)
-        if info is None:
-            continue                      # clase no relevante → ignorar
- 
+        cls_id = int(box.cls[0])
+
+        if es_custom:
+            # Nombre real leído del propio modelo, no de un mapa por ID a mano.
+            label     = model.names.get(cls_id, f"clase_{cls_id}")
+            categoria = CATEGORIA_POR_LABEL.get(label, "Otros")
+        else:
+            info = OBJECT_CLASS_MAP.get(cls_id)
+            if info is None:
+                continue                      # clase COCO no relevante → ignorar
+            label, categoria = info["label"], info["categoria"]
+
         conf_val = round(float(box.conf[0]), 3)
         x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
- 
+
         detections.append({
-            "label":     info["label"],
-            "categoria": info["categoria"],
+            "label":     label,
+            "categoria": categoria,
             "confianza": conf_val,
             "bbox":      [x1, y1, x2, y2],
         })
- 
+
     return detections
  
  
@@ -315,7 +394,11 @@ def analyze_objects(video_path: str, duration_seconds: float = 0.0) -> dict:
  
     fps_video   = cap.get(cv2.CAP_PROP_FPS) or 25.0
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
- 
+
+    # Frames nativos a saltar para muestrear a YOLO_SAMPLE_FPS reales,
+    # sin importar el fps nativo del video (25, 30, 60...).
+    frame_skip = max(1, round(fps_video / YOLO_SAMPLE_FPS))
+
     # Acumuladores por etiqueta institucional
     # Cada entrada: {frames, confianzas, primera_aparicion, ultima_aparicion, max_sim}
     stats: dict[str, dict] = defaultdict(lambda: {
@@ -343,7 +426,7 @@ def analyze_objects(video_path: str, duration_seconds: float = 0.0) -> dict:
         frame_idx += 1
  
         # Saltar frames según configuración
-        if frame_idx % YOLO_FRAME_SKIP != 0:
+        if frame_idx % frame_skip != 0:
             continue
  
         frames_proc  += 1
@@ -358,27 +441,37 @@ def analyze_objects(video_path: str, duration_seconds: float = 0.0) -> dict:
             personas_en_segundo = 0
  
         detections = detect_objects_in_frame(model, frame)
- 
-        # Contar cuántas instancias hay de cada etiqueta en este frame
+
+        # Contar cuántas instancias hay de cada etiqueta en este frame, y quedarnos
+        # con la mejor confianza de cada una (puede haber varias cajas de la misma
+        # clase en un mismo frame, ej. varios celulares a la vez).
         conteo_frame: dict[str, int] = defaultdict(int)
+        mejor_conf_frame: dict[str, float] = {}
+        categoria_frame: dict[str, str] = {}
         for det in detections:
-            conteo_frame[det["label"]] += 1
- 
+            lbl = det["label"]
+            conteo_frame[lbl] += 1
+            categoria_frame[lbl] = det["categoria"]
+            mejor_conf_frame[lbl] = max(mejor_conf_frame.get(lbl, 0.0), det["confianza"])
+
         # Personas para el timeline
         personas_en_segundo = max(
             personas_en_segundo,
             conteo_frame.get("Persona", 0)
         )
- 
-        # Actualizar stats por objeto
-        for det in detections:
-            lbl = det["label"]
-            s   = stats[lbl]
+
+        # Actualizar stats por objeto: una sola vez por etiqueta presente en el
+        # frame, sin importar cuántas instancias simultáneas haya (eso ya lo
+        # captura max_simultaneo). Contar por detección individual inflaba
+        # "frames_detectado" muy por encima del total de frames procesados,
+        # produciendo presencias imposibles (mayores a la duración del video).
+        for lbl, count in conteo_frame.items():
+            s = stats[lbl]
             s["frames_detectado"]  += 1
-            s["confianzas"].append(det["confianza"])
-            s["categoria"]          = det["categoria"]
-            s["max_simultaneo"]     = max(s["max_simultaneo"], conteo_frame[lbl])
- 
+            s["confianzas"].append(mejor_conf_frame[lbl])
+            s["categoria"]          = categoria_frame[lbl]
+            s["max_simultaneo"]     = max(s["max_simultaneo"], count)
+
             if s["primera_aparicion"] is None:
                 s["primera_aparicion"] = round(timestamp_s, 2)
             s["ultima_aparicion"] = round(timestamp_s, 2)
@@ -392,9 +485,15 @@ def analyze_objects(video_path: str, duration_seconds: float = 0.0) -> dict:
     if frames_proc == 0:
         return {"error": "No se procesaron frames del video"}
  
-    # Calcular segundos por frame procesado
-    # (cada frame procesado representa YOLO_FRAME_SKIP / fps_video segundos)
-    segundos_por_frame = YOLO_FRAME_SKIP / fps_video
+    # Segundos que representa cada frame procesado. Se ancla a la duración real
+    # del video (medida por audio, confiable) en vez de solo a fps_video reportado
+    # por el contenedor: algunos archivos (variable frame rate, metadata mal escrita)
+    # hacen que cv2 devuelva un fps incorrecto y eso antes producía presencias
+    # imposibles (ej. "37:35" en un video de 7 minutos).
+    if duration_seconds and frames_proc:
+        segundos_por_frame = duration_seconds / frames_proc
+    else:
+        segundos_por_frame = frame_skip / fps_video
  
     # ── Construir resultado por objeto ────────────────────────────
     objetos: list[dict] = []

@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,14 +20,3 @@ class AnalysisJob(Base):
     analista_id: Mapped[str | None] = mapped_column(String, nullable=True)
     nombre_analisis: Mapped[str | None] = mapped_column(String, nullable=True)
     file_hash: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
-
-class User(Base):
-    __tablename__ = "users"
-
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    email: Mapped[str] = mapped_column(String, unique=True, index=True)
-    password: Mapped[str] = mapped_column(String)  # hash bcrypt
-    nombre: Mapped[str] = mapped_column(String)
-    rol: Mapped[str] = mapped_column(String, default="analista")  # "analista" | "administrador"
-    activo: Mapped[bool] = mapped_column(default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

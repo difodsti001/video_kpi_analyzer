@@ -1,12 +1,6 @@
 # services/feedback/analyzer.py
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "none")  # "openai" | "anthropic" | "gemini" | "none"
-LLM_API_KEY  = os.getenv("LLM_API_KEY", "")
-
+# Interpretación determinista (por reglas) de los KPIs de oratoria.
+# Es el insumo que consume services/evaluacion/analyzer.py para la evaluación final.
 
 # ── 1. REGLAS — etiquetas e interpretación por KPI ──────────────
 
@@ -105,138 +99,14 @@ def calcular_score_global(interpretaciones: dict) -> float:
     return round(total * 10, 2)   # escala 0–10
 
 
-# ── 3. PROMPT COMPACTO para el LLM ──────────────────────────────
+# ── 3. INTERPRETACIÓN AGRUPADA ───────────────────────────────────
 
-def construir_prompt(interpretaciones: dict, score_global: float) -> str:
-    i = interpretaciones
-    fortalezas = [k for k, v in i.items() if v.get("fortaleza")]
-    mejoras    = [k for k, v in i.items() if not v.get("fortaleza")]
-
-    resumen_kpis = "\n".join(f"- {v['resumen']}" for v in i.values())
-
-    prompt = f"""Eres un analista de oratoria en la enseñanza de docentes. Analiza esta presentación y escribe un feedback 
-profesional en español, en 3 párrafos cortos: fortalezas, áreas de mejora y recomendación final.
-Sé específico con los datos. No uses listas, solo prosa fluida.
-
-Score general: {score_global}/10
-Fortalezas detectadas: {', '.join(fortalezas) if fortalezas else 'ninguna destacada'}
-Áreas a mejorar: {', '.join(mejoras) if mejoras else 'ninguna crítica'}
-
-Datos:
-{resumen_kpis}
-
-Feedback:"""
-
-    return prompt
-
-
-# ── 4. LLAMADA AL LLM ────────────────────────────────────────────
-
-def llamar_llm(prompt: str, interpretaciones: dict, score_global: float) -> str:
-    if LLM_PROVIDER == "anthropic":
-        return _llamar_anthropic(prompt)
-    elif LLM_PROVIDER == "openai":
-        return _llamar_openai(prompt)
-    elif LLM_PROVIDER == "gemini":
-        return _llamar_gemini(prompt)
-    return _generar_narrativa_reglas(interpretaciones, score_global)
-
-def _llamar_anthropic(prompt: str) -> str:
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=LLM_API_KEY)
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=400,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.content[0].text.strip()
-    except Exception as e:
-        return f"[Error LLM: {e}]"
-
-def _llamar_openai(prompt: str) -> str:
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=LLM_API_KEY)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            max_tokens=400,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"[Error LLM: {e}]"
-    
-def _llamar_gemini(prompt: str) -> str:
-    try:
-        from google import genai
-        client = genai.Client(api_key=LLM_API_KEY)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config={
-                "max_output_tokens": 400,
-                "temperature": 0.4
-            }
-        )
-
-        return response.text.strip()
-    except Exception as e:
-        return f"[Error LLM Gemini: {e}]"
-
-def _generar_narrativa_reglas(interpretaciones: dict, score_global: float) -> str:
-    i = interpretaciones
-    fortalezas = [k for k, v in i.items() if v.get("fortaleza")]
-    mejoras    = [k for k, v in i.items() if not v.get("fortaleza")]
-
-    nombres = {
-        "speech_time": "el tiempo de habla",
-        "rhythm":      "el ritmo",
-        "sentiment":   "el tono emocional",
-        "clarity":     "la claridad y estructura",
-        "audio":       "la expresividad vocal",
-    }
-
-    # párrafo 1 — score y fortalezas
-    p1 = f"La presentación obtuvo un score de {score_global}/10. "
-    if fortalezas:
-        lista = ", ".join(nombres[f] for f in fortalezas)
-        p1 += f"Los puntos más sólidos son {lista}, que muestran un desempeño destacado."
-    else:
-        p1 += "Hay oportunidades de mejora en varias dimensiones."
-
-    # párrafo 2 — detalle de cada KPI
-    detalles = " ".join(v["resumen"] for v in i.values())
-    p2 = detalles
-
-    # párrafo 3 — recomendación
-    if mejoras:
-        lista_mejoras = ", ".join(nombres[m] for m in mejoras)
-        p3 = f"Para seguir mejorando, se recomienda trabajar en {lista_mejoras}."
-    else:
-        p3 = "El desempeño es consistente en todas las dimensiones analizadas."
-
-    return f"{p1}\n\n{p2}\n\n{p3}"
-
-# ── 5. FUNCIÓN PRINCIPAL ─────────────────────────────────────────
-
-def analyze_feedback(speech: dict, rhythm: dict, sentiment: dict,
-                     clarity: dict, audio: dict) -> dict:
-    interpretaciones = {
+def construir_interpretaciones(speech: dict, rhythm: dict, sentiment: dict,
+                               clarity: dict, audio: dict) -> dict:
+    return {
         "speech_time": interpretar_speech_time(speech),
         "rhythm":      interpretar_rhythm(rhythm),
         "sentiment":   interpretar_sentiment(sentiment),
         "clarity":     interpretar_clarity(clarity),
         "audio":       interpretar_audio(audio),
-    }
-
-    score_global = calcular_score_global(interpretaciones)
-    prompt       = construir_prompt(interpretaciones, score_global)
-    narrativa = llamar_llm(prompt, interpretaciones, score_global)
-
-    return {
-        "score_global":      score_global,
-        "interpretaciones":  interpretaciones,
-        "prompt_usado":      prompt,
-        "narrativa":         narrativa,
     }

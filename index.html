@@ -242,8 +242,16 @@ input:focus, select:focus { border-color: var(--rojo); }
 .step-body  { flex: 1; }
 .step-name  { font-size: 13px; font-weight: 500; color: var(--texto); }
 .step-desc  { font-size: 11px; color: var(--texto-3); margin-top: 2px; }
-.step-prog  { height: 3px; background: var(--borde); border-radius: 2px; margin-top: 7px; }
+.step-prog  { height: 3px; background: var(--borde); border-radius: 2px; margin-top: 7px; overflow: hidden; }
 .step-prog-fill { height: 3px; border-radius: 2px; background: var(--rojo); transition: width .4s ease; }
+.step-prog-fill.indeterminate {
+  width: 40% !important;
+  animation: prog-slide 1.1s ease-in-out infinite;
+}
+@keyframes prog-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
 .step-status {
   font-size: 11px; color: var(--texto-3); white-space: nowrap;
   padding-top: 3px; min-width: 70px; text-align: right;
@@ -301,10 +309,10 @@ input:focus, select:focus { border-color: var(--rojo); }
   transform: translateX(-50%); border: 5px solid transparent;
   border-bottom-color: #1C1917;
 }
-.score-num   { font-family: var(--font-serif); font-size: 28px; font-weight: 600; color: #fff; line-height: 1; }
-.score-denom { font-size: 11px; color: rgba(255,255,255,.6); }
-.score-label { font-family: var(--font-serif); font-size: 17px; font-weight: 600; color: var(--rojo-dark); margin-bottom: 4px; }
-.score-desc  { font-size: 12px; color: #9B1C3B; line-height: 1.6; }
+.score-num   { font-family: var(--font-serif); font-size: 18px; font-weight: 600; color: #fff; line-height: 1; }
+.score-denom { font-size: 9px; color: rgba(255,255,255,.6); }
+.score-label { font-family: var(--font-serif); font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+.score-desc  { font-size: 12px; color: var(--texto-2); line-height: 1.6; }
 .score-tags  { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
 
 .kpi-layers { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
@@ -321,23 +329,6 @@ input:focus, select:focus { border-color: var(--rojo); }
 .kpi-fill   { height: 3px; border-radius: 2px; }
 .kpi-val    { font-size: 11px; font-weight: 500; color: var(--texto); min-width: 32px; text-align: right; }
 .layer-coming { padding: 24px 14px; border-top: 1px solid var(--borde); text-align: center; }
-
-.tl-bar   { height: 28px; background: var(--plomo-light); border-radius: 4px; position: relative; overflow: hidden; margin-bottom: 5px; }
-.tl-seg   { position: absolute; top: 0; height: 100%; }
-.tl-lbls  { display: flex; justify-content: space-between; font-size: 10px; color: var(--texto-3); }
-.tl-legend { display: flex; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
-.tl-li    { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--texto-2); cursor: help; position: relative; }
-.tl-li:hover .legend-tip { display: block; }
-.tl-dot   { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-.legend-tip {
-  display: none; position: absolute; bottom: calc(100% + 6px); left: 0;
-  background: #1C1917; color: #fff; font-size: 11px; padding: 8px 10px;
-  border-radius: var(--r-md); width: 180px; line-height: 1.5; z-index: 999;
-}
-.legend-tip::after {
-  content: ''; position: absolute; top: 100%; left: 10px;
-  border: 5px solid transparent; border-top-color: #1C1917;
-}
 
 .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 16px; }
 .metric-card  { background: var(--plomo-light); border-radius: var(--r-md); padding: 12px 14px; }
@@ -422,38 +413,6 @@ input:focus, select:focus { border-color: var(--rojo); }
 .obj-dist-fill  { height: 6px; border-radius: 3px; }
 
 /* ══════════════════════════════════
-   PANEL LATERAL
-══════════════════════════════════ */
-.side-panel {
-  width: 0; overflow: hidden; transition: width .25s ease;
-  background: var(--blanco); border-left: 1px solid var(--borde);
-  flex-shrink: 0;
-}
-.side-panel.open { width: 55vw; max-width: 900px }
-.panel-inner { width: 100%; padding: 22px; overflow-y: auto; max-height: calc(100vh - 54px); }
-.panel-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--borde);
-}
-.panel-title { font-family: var(--font-serif); font-size: 15px; font-weight: 600; color: var(--texto); }
-.close-btn {
-  width: 26px; height: 26px; border-radius: 50%;
-  background: var(--plomo-light); border: 1px solid var(--borde);
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 14px; color: var(--plomo); transition: all .15s;
-}
-.close-btn:hover { background: var(--borde); color: var(--texto); }
-
-.acciones-panel {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--borde);
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* ══════════════════════════════════
    ANIMACIONES
 ══════════════════════════════════ */
 @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.35} }
@@ -478,7 +437,6 @@ input:focus, select:focus { border-color: var(--rojo); }
   .kpi-layers   { grid-template-columns: 1fr; }
   .metrics-grid { grid-template-columns: 1fr 1fr; }
   .obj-resumen  { grid-template-columns: 1fr 1fr; }
-  .side-panel.open { width: 100%; }
 }
 
 /* ── Modal transcripción ── */
@@ -688,7 +646,6 @@ input:focus, select:focus { border-color: var(--rojo); }
               <div class="page-sub"  id="result-meta">—</div>
             </div>
             <div style="display:flex;gap:8px">
-              <button class="btn-outline" onclick="verTranscripcion()">Ver transcripción</button>
               <button class="btn-primary"  onclick="exportarPDF()">Exportar PDF</button>
             </div>
           </div>
@@ -708,17 +665,6 @@ input:focus, select:focus { border-color: var(--rojo); }
           </div>
         </div>
 
-      </div>
-    </div>
-
-    <!-- Panel lateral (admin) -->
-    <div class="side-panel" id="side-panel">
-      <div class="panel-inner">
-        <div class="panel-header">
-          <div class="panel-title" id="panel-title">Informe</div>
-          <div class="close-btn" onclick="closePanel()">✕</div>
-        </div>
-        <div id="panel-body"></div>
       </div>
     </div>
   </div>
@@ -823,7 +769,6 @@ async function iniciarAnalisis() {
   try {
     // ── Paso 1: subir archivo ──
     setStep('upload', 'running');
-    animateProgress('prog-upload', 3000);
 
     const formData = new FormData();
     formData.append('file',            state.selectedFile);
@@ -901,7 +846,6 @@ function forzarNuevoAnalisis() {
 // ══════════════════════════════════════════════════════
 function startPolling() {
   setStep('audio', 'running');
-  animateProgress('prog-audio', 8000);
 
   let pollCount = 0;
   state.pollInterval = setInterval(async () => {
@@ -935,22 +879,22 @@ function startPolling() {
 }
 
 function updateStepsFromStatus(status, tick) {
+  // El backend solo informa pending/running/done/failed (sin progreso por etapa).
+  // Esta escala de ticks es una estimación aproximada de en qué etapa del pipeline
+  // se encuentra, solo para decidir qué paso mostrar como "en proceso" — cada uno
+  // se dibuja con una barra indeterminada, no con un % real.
   if (status === 'running') {
     if (tick <= 3) {
       setStep('audio', 'running');
-      document.getElementById('prog-audio').style.width = Math.min(tick * 25, 75) + '%';
     } else if (tick <= 8) {
       setStep('audio', 'done');
       setStep('trans', 'running');
-      document.getElementById('prog-trans').style.width = Math.min((tick - 3) * 18, 90) + '%';
     } else if (tick <= 14) {
       setStep('trans', 'done');
       setStep('kpi', 'running');
-      document.getElementById('prog-kpi').style.width = Math.min((tick - 8) * 15, 90) + '%';
     } else {
       setStep('kpi', 'done');
       setStep('feed', 'running');
-      document.getElementById('prog-feed').style.width = Math.min((tick - 14) * 20, 90) + '%';
     }
   }
 }
@@ -973,9 +917,11 @@ function verResultado() {
 // RENDERIZAR RESULTADO
 // ══════════════════════════════════════════════════════
 function renderResultado(result, container) {
-  const fb = result.feedback || {};
-  const score = fb.score_global || 0;
-  const interp = fb.interpretaciones || {};
+  const detailId = 'result-detail';
+  const ev = result.evaluacion || {};
+  const score = ev.score_final || 0;
+  const interp = ev.interpretaciones_oratoria || {};
+  const criterios = ev.criterios || {};
   const kpis   = result.kpis || {};
   const speech = kpis.speech_time || {};
   const rhythm = kpis.rhythm || {};
@@ -984,22 +930,43 @@ function renderResultado(result, container) {
   const audio  = kpis.audio || {};
   const posture  = kpis.posture  || {};
   const objects  = kpis.objects  || {};
+  const videoInfo = result.video_info || {};
   const struct   = clar.structure || {};
   const tags   = buildTags(interp);
-  const narrativa = fb.narrativa || '—';
+  const resumenEjecutivo = ev.resumen_ejecutivo || '—';
 
-  container.innerHTML = `
+  const nivelFinal = getScoreNivel(score);
+
+  const heroHtml = `
   <div class="score-hero">
-    <div class="score-circle">
+    <div class="score-circle" style="background:${NIVEL_COLOR[nivelFinal]}">
       <div class="score-num">${score.toFixed(1)}</div>
-      <div class="score-denom">/ 10</div>
-      <div class="sc-tip">Promedio ponderado:<br>Texto 25% · Audio 25% · Ritmo 20% · Sentimiento 15% · Tiempo de habla 15%</div>
+      <div class="score-denom">/ 20</div>
+      <div class="sc-tip">Puntaje de referencia (70% contenido + 30% forma) usado para asignar el nivel.<br>Contenido: ${fmtVal(ev.score_rubrica,1)}/20 · Oratoria: ${fmtVal(ev.score_oratoria,1)}/10</div>
     </div>
     <div style="flex:1">
-      <div class="score-label">${getScoreLabel(score)}</div>
+      <div class="score-label" style="color:${NIVEL_COLOR[nivelFinal]}">${nivelFinal}</div>
       <div class="score-desc">${getScoreDesc(score)}</div>
       <div class="score-tags">${tags}</div>
     </div>
+  </div>
+
+  <div class="section-label">Resumen ejecutivo</div>
+  <div class="card">
+    <div class="feedback-box">${resumenEjecutivo.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>')}</div>
+  </div>`;
+
+  const detailHtml = `
+  <div style="margin:16px 0">
+    <button class="btn-outline" onclick="verTranscripcion()">Ver transcripción</button>
+  </div>
+
+  <div class="section-label">Ficha técnica del video</div>
+  <div class="metrics-grid" style="margin-bottom:16px">
+    ${metricCard('Duración', fmtTime(Math.round(videoInfo.duracion_segundos||0)), 'min:seg', 'Duración total del video analizado.')}
+    ${metricCard('Resolución', videoInfo.resolucion||'—', videoInfo.calidad||'—', 'Ancho x alto en píxeles, y una etiqueta de calidad aproximada: SD (<480p) · HD (720p) · Full HD (1080p) · 4K (2160p+).')}
+    ${metricCard('Fps', videoInfo.fps||'—', 'cuadros por segundo', 'Cuadros por segundo del archivo original. No afecta el análisis, que muestrea a una tasa fija.')}
+    ${metricCard('Peso del archivo', fmtVal(videoInfo.tamano_mb,1)+' MB', 'tamaño en disco', 'Tamaño del archivo de video subido.')}
   </div>
 
   <div class="section-label">Análisis por capa</div>
@@ -1013,13 +980,13 @@ function renderResultado(result, container) {
         </div>
       </div>
       <div class="layer-body">
-        ${kpiRow('Claridad', clar.clarity_score||0, fmtVal(clar.clarity_score), 'var(--rojo)', 'Qué tan fácil es entender el mensaje. Mejora usando frases más cortas y evitando repeticiones.')}
+        ${kpiRow('Claridad', clar.clarity_score||0, fmtVal(clar.clarity_score), 'var(--rojo)', 'Qué tan fácil es entender el mensaje, en escala 0–1. Rangos: <0.60 bajo · 0.60–0.80 medio · >0.80 alto.')}
         
         ${kpiRow('Estructura', struct.structure_score||0, fmtVal(struct.structure_score), 'var(--rojo)', 'Qué tan bien organizas las ideas (inicio, desarrollo y cierre). Una buena estructura facilita la comprensión.')}
         
-        ${kpiRow('Sentimiento', ((sent.overall_score||0)+1)/2, (sent.overall_score>=0?'+':'')+fmtVal(sent.overall_score), 'var(--rojo)', 'Indica si el mensaje suena positivo, neutro o negativo. Un tono positivo conecta mejor con la audiencia. Negativo: -1.0, Positivo: +1.0')}
+        ${kpiRow('Sentimiento', ((sent.overall_score||0)+1)/2, (sent.overall_score>=0?'+':'')+fmtVal(sent.overall_score), 'var(--rojo)', 'Tono del mensaje, en escala -1.0 (muy negativo) a +1.0 (muy positivo). Rangos: <-0.2 negativo · -0.2 a 0.2 neutro · >0.2 positivo.')}
         
-        ${kpiRow('Fillers', 1-Math.min((clar.filler_ratio||0)/0.05,1), String(clar.filler_count||0), '#F59E0B', 'Cantidad de muletillas como "eh" o "este". Menos muletillas hacen una comunicación más clara y profesional.')}
+        ${kpiRow('Fillers', 1-Math.min((clar.filler_ratio||0)/0.05,1), String(clar.filler_count||0), '#F59E0B', 'Cantidad de muletillas como "eh" o "este". La barra llega a 0 cuando los fillers superan el 5% de las palabras totales — a menos fillers, mejor.')}
       </div>
     </div>
 
@@ -1032,46 +999,34 @@ function renderResultado(result, container) {
         </div>
       </div>
       <div class="layer-body">
-        ${kpiRow('Expresividad', audio.expresividad_score||0, fmtVal(audio.expresividad_score), 'var(--plomo)', 'Qué tanto varía la voz al hablar. Más variación hace una presentación más dinámica y menos monótona.')}
-        
-        ${kpiRow('Proyección', audio.proyeccion_score||0, fmtVal(audio.proyeccion_score), 'var(--plomo)', 'Qué tan fuerte y clara se escucha la voz. Una buena proyección transmite seguridad.')}
-        
-        ${kpiRow('Ritmo WPM', Math.min((rhythm.avg_wpm||0)/160,1), String(Math.round(rhythm.avg_wpm||0)), 'var(--plomo)', 'Velocidad al hablar (palabras por minuto). Un ritmo adecuado facilita la comprensión (ideal: 120–160).')}
-        
-        ${kpiRow('Speech ratio', speech.speech_ratio||0, pct(speech.speech_ratio), 'var(--plomo)', 'Porcentaje del tiempo en que se esta hablando. Un buen equilibrio incluye pausas para enfatizar ideas.')}
+        ${kpiRow('Expresividad', audio.expresividad_score||0, fmtVal(audio.expresividad_score), 'var(--plomo)', 'Variación del tono de voz (pitch). Rangos: <0.15 monótono · 0.15–0.25 expresivo · >0.25 muy expresivo. Más alto es mejor.')}
+
+        ${kpiRow('Proyección', audio.proyeccion_score||0, fmtVal(audio.proyeccion_score), 'var(--plomo)', 'Qué tan fuerte y clara se escucha la voz, en escala 0–1. Desde 0.8 se considera proyección sólida; por debajo, mejorable.')}
+
+        ${kpiRow('Ritmo WPM', Math.min((rhythm.avg_wpm||0)/160,1), String(Math.round(rhythm.avg_wpm||0)), 'var(--plomo)', 'Palabras por minuto. Rangos: <120 lento · 120–160 óptimo · >160 rápido.')}
+
+        ${kpiRow('Speech ratio', speech.speech_ratio||0, pct(speech.speech_ratio), 'var(--plomo)', 'Porcentaje del tiempo en que se está hablando (vs. silencio). Rangos: <60% bajo · 60–75% óptimo · >75% alto.')}
       </div>
     </div>
 
     ${layerVideo(posture)}
   </div>
 
-  <div class="section-label">Timeline de la presentación</div>
-  <div class="card" style="padding:16px 20px">
-    ${buildTimeline(rhythm, sent, posture)}
-    <div class="tl-legend">
-      <div class="tl-li"><div class="tl-dot" style="background:#60A5FA"></div>Habla activa<div class="legend-tip">Segmentos donde se detectó voz activa.</div></div>
-      <div class="tl-li"><div class="tl-dot" style="background:#16A34A"></div>Tono positivo<div class="legend-tip">Sentimiento positivo detectado por NLP. Semáforo verde.</div></div>
-      <div class="tl-li"><div class="tl-dot" style="background:#DC2626"></div>Tono negativo<div class="legend-tip">Sentimiento negativo detectado por NLP. Semáforo rojo.</div></div>
-      <div class="tl-li"><div class="tl-dot" style="background:#1F2937"></div>Pausa<div class="legend-tip">Silencio mayor a 0.5 segundos entre palabras.</div></div>
-      <div class="tl-li"><div class="tl-dot" style="background:#A855F7"></div>Gesto<div class="legend-tip">Frame donde se detectó mano levantada o brazos abiertos.</div></div>
-    </div>
-  </div>
-
   ${buildObjectsSection(objects)}
 
   <div class="section-label">Métricas detalladas</div>
   <div class="metrics-grid">
-    ${metricCard('WPM promedio', Math.round(rhythm.avg_wpm||0), 'óptimo 120–160', 'Cantidad de palabras por minuto mientras se habla.')}
+    ${metricCard('WPM promedio', Math.round(rhythm.avg_wpm||0), 'óptimo 120–160', 'Palabras por minuto. Rangos: <120 lento · 120–160 óptimo · >160 rápido.')}
 
-    ${metricCard('Pausas estratégicas', rhythm.strategic_pauses||0, 'prom. '+fmtVal(speech.avg_silence)+'s', 'Pausas usadas para enfatizar ideas o dar tiempo a la audiencia para procesar la información.')}
+    ${metricCard('Pausas estratégicas', rhythm.strategic_pauses||0, 'prom. '+fmtVal(speech.avg_silence)+'s', 'Pausas usadas para enfatizar ideas o dar tiempo a la audiencia para procesar la información. No tiene un rango ideal fijo; se evalúa junto al resto del discurso.')}
 
-    ${metricCard('Vocabulario único', clar.unique_words||0, 'diversidad '+fmtVal(clar.vocab_diversity), 'Cantidad de palabras diferentes que se usan. Más variedad hace el discurso más rico.')}
+    ${metricCard('Vocabulario único', clar.unique_words||0, 'diversidad '+fmtVal(clar.vocab_diversity), 'Cantidad de palabras diferentes usadas. "Diversidad" (0–1) es la proporción de palabras únicas sobre el total — más alto indica un vocabulario más variado.')}
 
-    ${metricCard('Preguntas retóricas', struct.preguntas_retoricas||0, fmtVal(struct.preguntas_por_min)+' por min', 'Preguntas usadas para mantener la atención del público.')}
+    ${metricCard('Preguntas retóricas', struct.preguntas_retoricas||0, fmtVal(struct.preguntas_por_min)+' por min', 'Preguntas usadas para mantener la atención del público. No tiene un rango ideal fijo; más no siempre es mejor, depende del contexto de la clase.')}
 
-    ${metricCard('Pitch medio', Math.round(audio.pitch_mean_hz||0)+' Hz', 'variación '+fmtVal(audio.pitch_variation), 'Tono promedio de la voz (más grave o más agudo).')}
+    ${metricCard('Pitch medio', Math.round(audio.pitch_mean_hz||0)+' Hz', 'variación '+fmtVal(audio.pitch_variation), 'Tono promedio de la voz. No existe un valor "bueno o malo" — varía naturalmente entre personas. Lo relevante es la variación (0–1): <0.15 monótono · 0.15–0.25 expresivo · >0.25 muy expresivo.')}
 
-    ${metricCard('Energía vocal', fmtVal(audio.energy_mean,3), 'proyección '+(audio.proyeccion_score>=0.8?'sólida':'mejorable'), 'Nivel de intensidad de la voz. Una buena energía ayuda a mantener la atención.')}
+    ${metricCard('Energía vocal', fmtVal(audio.energy_mean,3), 'proyección '+(audio.proyeccion_score>=0.8?'sólida':'mejorable'), 'Intensidad (RMS) de la voz. Se traduce en el score de proyección (0–1): desde 0.8 es sólida, por debajo es mejorable.')}
 
     ${metricCard('Conectores', (Object.keys(struct.conectores||{}).length)+' tipos', (Object.keys(struct.conectores||{}).slice(0,2).join(', '))||'—', 'Palabras que conectan ideas (como “porque”, “pero”, “además”).')}
 
@@ -1081,10 +1036,83 @@ function renderResultado(result, container) {
     ${(posture && posture.gestos) ? metricCard('Gesto predominante', posture.gestos.gesto_predominante||'—', 'brazos abiertos '+pct(posture.gestos.brazos_abiertos_ratio), 'Gesto más frecuente detectado. Brazos abiertos transmiten confianza.') : ''}
   </div>
 
-  <div class="section-label">Feedback narrativo</div>
-  <div class="card">
-    <div class="feedback-box">${narrativa.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>')}</div>
+  ${buildLeyendaSection()}
+
+  <div class="section-label">Rúbrica de contenido pedagógico</div>
+  <div class="card" style="padding:16px 20px">
+    ${buildRubricaSection(criterios)}
   </div>`;
+
+  container.innerHTML = `${heroHtml}
+  <div style="margin:14px 0">
+    <button class="btn-outline" onclick="toggleDetalle(this, '${detailId}')">Ver detalle</button>
+  </div>
+  <div id="${detailId}" class="result-detail hidden">${detailHtml}</div>`;
+}
+
+function toggleDetalle(btn, detailId) {
+  const d = document.getElementById(detailId);
+  if (!d) return;
+  const hidden = d.classList.toggle('hidden');
+  btn.textContent = hidden ? 'Ver detalle' : 'Ocultar detalle';
+}
+
+function buildLeyendaSection() {
+  const filas = [
+    ['Tiempo de habla',  '% del tiempo hablando vs. silencio', '<60% bajo · 60–75% óptimo · >75% alto'],
+    ['Ritmo (WPM)',      'Palabras por minuto',                 '<120 lento · 120–160 óptimo · >160 rápido'],
+    ['Claridad',         'Escala 0–1',                          '<0.60 bajo · 0.60–0.80 medio · >0.80 alto'],
+    ['Sentimiento',      'Escala -1.0 a +1.0',                  '<-0.2 negativo · -0.2 a 0.2 neutro · >0.2 positivo'],
+    ['Expresividad',     'Variación del tono de voz, escala 0–1', '<0.15 monótono · 0.15–0.25 expresivo · >0.25 muy expresivo'],
+    ['Proyección',       'Fuerza y claridad de la voz, escala 0–1', '<0.80 mejorable · ≥0.80 sólida'],
+    ['Fillers',          'Muletillas ("eh", "este") sobre el total de palabras', 'a menos, mejor — la barra llega a 0 en 5% o más'],
+    ['Nivel de rúbrica (C1-C6 y global)', 'Escala de desempeño pedagógico', 'Inicio · En desarrollo · Logrado · Destacado'],
+  ];
+  const filasHtml = filas.map(([k, desc, rango]) => `
+    <tr>
+      <td style="padding:6px 10px;font-weight:500;color:var(--texto);white-space:nowrap">${k}</td>
+      <td style="padding:6px 10px;color:var(--texto-2)">${desc}</td>
+      <td style="padding:6px 10px;color:var(--texto-2)">${rango}</td>
+    </tr>`).join('');
+
+  return `
+  <div class="card" style="padding:14px 18px;margin-bottom:16px">
+    <button class="btn-outline" style="font-size:12px;padding:5px 10px" onclick="this.nextElementSibling.classList.toggle('hidden')">Mostrar/ocultar leyenda de métricas</button>
+    <div class="hidden" style="margin-top:12px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="border-bottom:1px solid var(--borde)">
+            <th style="text-align:left;padding:6px 10px;color:var(--texto-3);font-weight:500">Métrica</th>
+            <th style="text-align:left;padding:6px 10px;color:var(--texto-3);font-weight:500">Qué mide</th>
+            <th style="text-align:left;padding:6px 10px;color:var(--texto-3);font-weight:500">Rangos</th>
+          </tr>
+        </thead>
+        <tbody>${filasHtml}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+const NIVEL_COLOR = {
+  'Inicio':        '#DC2626',
+  'En desarrollo': '#F59E0B',
+  'Logrado':       '#16A34A',
+  'Destacado':     '#0369A1',
+};
+
+function buildRubricaSection(criterios) {
+  const entries = Object.entries(criterios);
+  if (!entries.length) return `<div style="color:var(--texto-3);font-size:12px">No hay evaluación de rúbrica disponible.</div>`;
+
+  return entries.map(([id, c]) => `
+    <div style="padding:10px 0;border-bottom:1px solid var(--borde)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:13px;font-weight:500;color:var(--texto)">${id} · ${c.nombre} <span style="color:var(--texto-3);font-weight:400">(peso ${(c.peso*100).toFixed(0)}%)</span></span>
+        <span class="badge" style="background:${NIVEL_COLOR[c.nivel]||'#94A3B8'}22;color:${NIVEL_COLOR[c.nivel]||'#57534E'}">${c.nivel}</span>
+      </div>
+      <div style="font-size:12px;color:var(--texto-2)">${c.justificacion || '—'}</div>
+    </div>
+  `).join('');
 }
 
 // ══════════════════════════════════════════════════════
@@ -1108,42 +1136,6 @@ function metricCard(name, val, sub, tip) {
     <div class="metric-val">${val}</div>
     <div class="metric-sub">${sub}</div>
   </div>`;
-}
-
-function buildTimeline(rhythm, sent, posture) {
-  const timeline = (rhythm.wpm_timeline || []).slice(0, 14);
-  if (!timeline.length) {
-    return `<div class="tl-bar"></div><div class="tl-lbls"><span>0:00</span><span>fin</span></div>`;
-  }
-  const total = (timeline[timeline.length-1]?.second || 1) + 60;
-
-  // Capa 1: habla activa (azul) vs pausa (negro)
-  const segs = timeline.map(t => {
-    const left  = (t.second / total * 100).toFixed(1);
-    const width = (60 / total * 100).toFixed(1);
-    const color = t.wpm > 50 ? '#60A5FA' : '#1F2937';
-    return `<div class="tl-seg" style="left:${left}%;width:${width}%;background:${color}"></div>`;
-  }).join('');
-
-  // Capa 2: semáforo de sentimiento — verde positivo, rojo negativo
-  const sentSegs = (sent.timeline || []).map(t => {
-    const left  = (t.second / total * 100).toFixed(1);
-    const width = (60 / total * 100).toFixed(1);
-    if (t.label === 'positive') return `<div class="tl-seg" style="left:${left}%;width:${width}%;background:#16A34A;opacity:.65"></div>`;
-    if (t.label === 'negative') return `<div class="tl-seg" style="left:${left}%;width:${width}%;background:#DC2626;opacity:.65"></div>`;
-    return '';
-  }).join('');
-
-  // Capa 3: gestos (morado) — frames con mano arriba o brazos abiertos
-  const gestureSegs = ((posture || {}).timeline || [])
-    .filter(t => t.hand_up || t.arms_open)
-    .map(t => {
-      const left = (t.second / total * 100).toFixed(1);
-      return `<div class="tl-seg" style="left:${left}%;width:.8%;background:#A855F7;opacity:.9"></div>`;
-    }).join('');
-
-  const lbls = [0, .25, .5, .75, 1].map(f => `<span>${fmtTime(Math.round(f * total))}</span>`).join('');
-  return `<div class="tl-bar">${segs}${sentSegs}${gestureSegs}</div><div class="tl-lbls">${lbls}</div>`;
 }
 
 function layerVideo(posture) {
@@ -1278,7 +1270,9 @@ function buildObjectsSection(objects) {
   // ── Tabla de objetos
   const rowsHtml = objs.map(o => {
     const color    = objectCategoryColor(o.categoria);
+    const presReal = Math.min(o.presencia_segundos, dur);   // nunca más que la duración real
     const barPct   = Math.round((o.presencia_segundos / maxPres) * 100);
+    const pctVideo = Math.min(100, Math.round((presReal / dur) * 100));
     const conf     = o.confianza_promedio != null ? (o.confianza_promedio * 100).toFixed(0) + '%' : '—';
     const primera  = o.primera_aparicion  != null ? fmtTime(Math.round(o.primera_aparicion))  : '—';
     const ultima   = o.ultima_aparicion   != null ? fmtTime(Math.round(o.ultima_aparicion))   : '—';
@@ -1293,7 +1287,7 @@ function buildObjectsSection(objects) {
           <div class="obj-pres-track">
             <div class="obj-pres-fill" style="width:${barPct}%;background:${color}"></div>
           </div>
-          <span>${fmtTime(Math.round(o.presencia_segundos))}</span>
+          <span><strong>${pctVideo}%</strong> <span style="color:var(--texto-3)">(${fmtTime(Math.round(presReal))})</span></span>
         </div>
       </td>
       <td>${conf}</td>
@@ -1308,7 +1302,7 @@ function buildObjectsSection(objects) {
         <table class="obj-table">
           <thead><tr>
             <th>Elemento detectado</th>
-            <th>Presencia</th>
+            <th>Presencia (% del video)</th>
             <th>Confianza</th>
             <th>Máx. simult.</th>
             <th>1ª aparición</th>
@@ -1375,16 +1369,16 @@ function buildTags(interp) {
   }).join('');
 }
 
-function getScoreLabel(s) {
-  if (s >= 9) return 'Orador destacado';
-  if (s >= 7) return 'Orador competente';
-  if (s >= 5) return 'Orador en desarrollo';
-  return 'Requiere mejora significativa';
+function getScoreNivel(s) {
+  if (s >= 18) return 'Destacado';
+  if (s >= 14) return 'Logrado';
+  if (s >= 11) return 'En desarrollo';
+  return 'Inicio';
 }
 function getScoreDesc(s) {
-  if (s >= 9) return 'Desempeño sobresaliente en todas las dimensiones evaluadas.';
-  if (s >= 7) return 'Buen desempeño general con áreas de mejora identificadas.';
-  if (s >= 5) return 'Desempeño básico con oportunidades claras de mejora.';
+  if (s >= 18) return 'Desempeño sobresaliente en contenido pedagógico y oratoria.';
+  if (s >= 14) return 'Buen desempeño general con áreas de mejora identificadas.';
+  if (s >= 11) return 'Desempeño básico con oportunidades claras de mejora.';
   return 'Se recomienda trabajo intensivo en las dimensiones clave.';
 }
 
@@ -1399,7 +1393,7 @@ function saveToLocalHistory() {
     dep:         document.getElementById('inp-dep').value || '—',
     filename:    state.selectedFile?.name || '—',
     fecha:       new Date().toLocaleDateString('es-PE',{day:'numeric',month:'short',year:'numeric'}),
-    score:       state.currentResult?.feedback?.score_global || 0,
+    score:       state.currentResult?.evaluacion?.score_final || 0,
     result:      state.currentResult,
   };
   const hist = JSON.parse(localStorage.getItem('kpi_history') || '[]');
@@ -1445,7 +1439,7 @@ async function loadHistorial() {
         ? new Date(j.created_at).toLocaleDateString('es-PE')
         : '—';
 
-      return `<tr class="clickable" onclick="openPanelFromAPI('${j.job_id}')">
+      return `<tr class="clickable" onclick="verJobPorId('${j.job_id}')">
         <td>${j.nombre_analisis}</td>
         <td>${j.presentador || '—'}</td>
         <td>${j.tipo || '—'}</td>
@@ -1476,99 +1470,6 @@ async function loadHistorial() {
   }
 }
 
-function openPanel() {
-  document.getElementById('side-panel').classList.add('open');
-}
-
-function verDesdeHistorial(entry) {
-  state.currentResult = entry.result;
-  state.currentJobId  = entry.job_id;
-  renderResultado(entry.result, document.getElementById('result-body'));
-  document.getElementById('result-title').textContent = `Informe — ${entry.presentador}`;
-  document.getElementById('result-meta').textContent  = `${entry.filename} · ${entry.fecha}`;
-  showPage('result');
-}
-
-async function openPanelFromAPI(jobId) {
-  try {
-    const res = await fetch(`${API_BASE}/analyze/${jobId}`);
-    const data = await res.json();
-
-    if (!data.result) return;
-
-    state.currentResult = data.result;
-    state.currentJobId  = jobId;
-
-    const pb = document.getElementById('panel-body');
-
-    renderResultado(data.result, pb);
-
-    pb.innerHTML += `
-      <div class="acciones-panel">
-        <button class="btn-primary" onclick="exportarPDF()">📄 Exportar PDF</button>
-        <button class="btn-outline" onclick="verTranscripcion()">📝 Transcripción</button>
-      </div>
-    `;
-
-    document.getElementById('panel-title').textContent =
-      data.filename || 'Informe';
-
-    openPanel();
-
-  } catch (e) {
-    showToast('Error al cargar detalle');
-  }
-}
-
-// ══════════════════════════════════════════════════════
-// PANEL LATERAL
-// ══════════════════════════════════════════════════════
-function openPanelWithData(entry) {
-  document.getElementById('panel-title').textContent = `${entry.presentador} — ${entry.fecha}`;
-  const pb = document.getElementById('panel-body');
-  const score = entry.score || 0;
-  pb.innerHTML = `
-    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--borde)">
-      <div style="width:52px;height:52px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <span style="font-family:var(--font-serif);font-size:18px;font-weight:600;color:#fff">${score.toFixed(1)}</span>
-      </div>
-      <div>
-        <div style="font-size:14px;font-weight:500;color:var(--texto);margin-bottom:2px">${entry.presentador}</div>
-        <div style="font-size:11px;color:var(--texto-2)">${entry.tipo} · ${entry.dep}</div>
-        <div style="font-size:11px;color:var(--texto-3)">Analista: ${entry.analista} · ${entry.fecha}</div>
-      </div>
-    </div>
-    <div id="pdf-content">
-      <div id="panel-result-body"></div>
-    </div>
-    <div class="no-pdf" style="margin-top:14px;display:flex;gap:8px">
-      <button class="btn-primary" style="font-size:11px;padding:7px 14px" onclick="exportarPDF()">PDF</button>
-      <button class="btn-outline"  style="font-size:11px" onclick="compartirLink('${entry.job_id}')">Compartir</button>
-    </div>`;
-  if (entry.result) renderResultado(entry.result, document.getElementById('panel-result-body'));
-  document.getElementById('side-panel').classList.add('open');
-}
-
-function closePanel() {
-  document.getElementById('side-panel').classList.remove('open');
-
-  const pb = document.getElementById('panel-body');
-  if (pb) pb.innerHTML = '';
-}
-
-document.addEventListener('click', function (e) {
-  const panel = document.getElementById('side-panel');
-
-  if (!panel.classList.contains('open')) return;
-
-  const clickedInsidePanel = panel.contains(e.target);
-  const isTrigger = e.target.closest('.open-panel-trigger');
-
-  if (!clickedInsidePanel && !isTrigger) {
-    closePanel();
-  }
-});
-
 // ══════════════════════════════════════════════════════
 // TRANSCRIPCION / EXPORTAR
 // ══════════════════════════════════════════════════════
@@ -1591,18 +1492,12 @@ function copiarTranscripcion() {
     document.body.removeChild(ta); showToast('Transcripción copiada');
   });
 }
-function compartirLink(jobId) {
-  const url = `\${window.location.origin}?job=\${jobId}`;
-  navigator.clipboard?.writeText(url).catch(()=>{});
-  showToast('Enlace copiado al portapapeles');
-}
 
 let exporting = false;
 
 function exportarPDF() {
   // Posibles contenedores según módulo
   let element =
-    document.getElementById('pdf-content') ||  // panel lateral
     document.getElementById('result-body') ||  // resultado individual
     document.getElementById('mis-body')    ||  // mis análisis
     document.getElementById('history-body');   // historial global
@@ -1617,6 +1512,10 @@ function exportarPDF() {
   // Ocultar botones y elementos que no queremos en PDF
   const hideElements = element.querySelectorAll('button, .no-pdf');
   hideElements.forEach(el => el.style.display = 'none');
+
+  // El detalle y la leyenda pueden estar colapsados en pantalla — para el PDF siempre van completos
+  const collapsedDetails = Array.from(element.querySelectorAll('.hidden'));
+  collapsedDetails.forEach(el => el.classList.remove('hidden'));
 
   // Agregar encabezado
   const header = document.createElement('div');
@@ -1649,6 +1548,7 @@ function exportarPDF() {
       document.body.classList.remove('pdf-mode');
       header.remove();
       hideElements.forEach(el => el.style.display = '');
+      collapsedDetails.forEach(el => el.classList.add('hidden'));
     });
 
   showToast('Generando PDF...');
@@ -1664,7 +1564,7 @@ function resetSteps() {
     const dot = document.getElementById('dot-'+k);
     if (dot) { dot.className = 'step-dot'; dot.style.background = i===0?'var(--rojo)':'var(--borde)'; }
     const prog = document.getElementById('prog-'+k);
-    if (prog) prog.style.width = '0%';
+    if (prog) { prog.classList.remove('indeterminate'); prog.style.width = '0%'; }
     const stat = document.getElementById('stat-'+k);
     if (stat) { stat.textContent = i===0?'en proceso':'pendiente'; stat.className = 'step-status'+(i===0?' running':''); }
   });
@@ -1677,22 +1577,19 @@ function setStep(key, status) {
   const step = document.getElementById('step-'+key);
   const dot  = document.getElementById('dot-'+key);
   const stat = document.getElementById('stat-'+key);
+  const prog = document.getElementById('prog-'+key);
   if (!step) return;
   step.classList.remove('pending');
   dot.className = 'step-dot' + (status==='running'?' running':'');
   dot.style.background = status==='done' ? '#16A34A' : status==='running' ? 'var(--rojo)' : 'var(--borde)';
   stat.textContent = status==='done' ? 'completado' : status==='running' ? 'en proceso' : 'pendiente';
   stat.className   = 'step-status' + (status==='running'?' running':status==='done'?' done':'');
-}
-
-function animateProgress(id, duration) {
-  const el    = document.getElementById(id);
-  const start = Date.now();
-  const anim  = setInterval(() => {
-    const pct = Math.min(90, (Date.now() - start) / duration * 100);
-    el.style.width = pct + '%';
-    if (pct >= 90) clearInterval(anim);
-  }, 80);
+  if (prog) {
+    // No conocemos el avance real dentro de cada etapa (el backend no lo reporta),
+    // así que "en proceso" se muestra como indeterminado en vez de simular un %.
+    prog.classList.toggle('indeterminate', status === 'running');
+    prog.style.width = status === 'done' ? '100%' : status === 'running' ? '' : '0%';
+  }
 }
 
 function showError(msg) {

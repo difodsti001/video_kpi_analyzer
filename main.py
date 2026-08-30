@@ -10,12 +10,6 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from fastapi import Depends
-
-from passlib.context   import CryptContext
-from jose              import JWTError, jwt
-from fastapi.security  import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -28,17 +22,13 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore")
 
 from shared.database import engine, get_db, Base
-from shared.models   import AnalysisJob, User
+from shared.models   import AnalysisJob
 from core           import VideoAnalyzer
 
 Base.metadata.create_all(bind=engine)
 
 VIDEO_FOLDER = os.getenv("VIDEO_FOLDER", "./video")
 os.makedirs(VIDEO_FOLDER, exist_ok=True)
-
-SECRET_KEY = os.getenv("SECRET_KEY", " ")
-ALGORITHM  = "HS256"
-TOKEN_EXP  = 60 * 8
 
 app = FastAPI(title="Video KPI Analyzer", version="1.0.0")
 
@@ -49,33 +39,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ── login ───────────────────────────────────────────────
-
-pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2  = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-def hash_password(p): return pwd_ctx.hash(p)
-def verify_password(plain, hashed): return pwd_ctx.verify(plain, hashed)
-
-def create_token(data: dict):
-    exp = datetime.utcnow() + timedelta(minutes=TOKEN_EXP)
-    return jwt.encode({**data, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
-
-def get_current_user(token: str = Depends(oauth2), db: Session = Depends(get_db)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user = db.query(User).filter_by(id=payload.get("sub")).first()
-        if not user or not user.activo:
-            raise HTTPException(401, "No autorizado")
-        return user
-    except JWTError:
-        raise HTTPException(401, "Token inválido")
-
-def require_admin(user = Depends(get_current_user)):
-    if user.rol != "administrador":
-        raise HTTPException(403, "Solo administradores")
-    return user
 
 
 # ── background task ───────────────────────────────────────────────
@@ -149,22 +112,6 @@ def serve_index():
     return FileResponse("index.html")
 
 # ── endpoints ─────────────────────────────────────────────────────
-
-@app.post("/auth/login")
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter_by(email=form.username).first()
-    if not user or not verify_password(form.password, user.password):
-        raise HTTPException(400, "Credenciales incorrectas")
-    token = create_token({"sub": user.id, "rol": user.rol})
-    return {"access_token": token, "token_type": "bearer", "rol": user.rol, "nombre": user.nombre}
-
-@app.post("/auth/register")
-def register(email: str, nombre: str, password: str, rol: str = "analista", db: Session = Depends(get_db)):
-    if db.query(User).filter_by(email=email).first():
-        raise HTTPException(400, "Usuario ya existe")
-    user = User(email=email, nombre=nombre, password=hash_password(password), rol=rol)
-    db.add(user); db.commit()
-    return {"id": user.id, "email": user.email, "rol": user.rol}
 
 @app.post("/analyze/from-file")
 def analyze_from_file(
@@ -284,7 +231,7 @@ def list_jobs(analista_id: str = "", db: Session = Depends(get_db)):
             "analista_id":     j.analista_id,
             "status":          j.status,
             "created_at":      j.created_at.isoformat() if j.created_at else None,
-            "score":           j.result.get("feedback", {}).get("score_global") if j.result else None,
+            "score":           j.result.get("evaluacion", {}).get("score_final") if j.result else None,
         }
         for j in jobs
     ]
@@ -314,8 +261,8 @@ def get_result_clean(job_id: str, db: Session = Depends(get_db)):
 
     result = job.result or {}
 
-    feedback = result.get("feedback", {})
-    interpretaciones = feedback.get("interpretaciones", {})
+    evaluacion = result.get("evaluacion", {})
+    interpretaciones = evaluacion.get("interpretaciones_oratoria", {})
 
     def get_nivel(kpi):
         return interpretaciones.get(kpi, {}).get("nivel", "desconocido")
@@ -325,12 +272,18 @@ def get_result_clean(job_id: str, db: Session = Depends(get_db)):
         "status": job.status,
 
         "summary": {
-            "score_global": feedback.get("score_global", 0),
-            "duracion_min": round(result.get("duration_seconds", 0) / 60, 2),
-            "palabras": result.get("total_words", 0),
+            "score_final":    evaluacion.get("score_final", 0),
+            "score_rubrica":  evaluacion.get("score_rubrica"),
+            "score_oratoria": evaluacion.get("score_oratoria"),
+            "duracion_min":   round(result.get("duration_seconds", 0) / 60, 2),
+            "palabras":       result.get("total_words", 0),
         },
 
-        "feedback": feedback.get("narrativa", "No se pudo generar feedback"),
+        "video_info": result.get("video_info", {}),
+
+        "resumen_ejecutivo": evaluacion.get("resumen_ejecutivo", "No se pudo generar la evaluación"),
+
+        "criterios_rubrica": evaluacion.get("criterios", {}),
 
         "kpis": {
             "speech_time": get_nivel("speech_time"),
