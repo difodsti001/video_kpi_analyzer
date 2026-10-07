@@ -678,6 +678,10 @@ input:focus, select:focus { border-color: var(--rojo); }
 // CONFIG — URL de la API
 // ══════════════════════════════════════════════════════
 const API_BASE = '';
+// Clave compartida para los endpoints de análisis (X-API-Key).
+// Nota: al vivir en el frontend, cualquiera puede verla inspeccionando el código
+// fuente — solo evita abuso casual/bots, no reemplaza autenticación real.
+const API_KEY = 'E96OGmSwIpz4sDKBJHnOCSgESEgKMC7_RiUayVXfQNI';
 
 // Mostrar la app directamente sin login
 document.addEventListener('DOMContentLoaded', () => {
@@ -777,7 +781,11 @@ async function iniciarAnalisis() {
     formData.append('tipo',            tipo);
     formData.append('dependencia',     dep);
 
-    const res  = await fetch(`${API_BASE}/analyze/upload`, { method: 'POST', body: formData });
+    const res  = await fetch(`${API_BASE}/analyze/upload`, {
+      method: 'POST',
+      headers: { 'X-API-Key': API_KEY },
+      body: formData,
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
     const data = await res.json();
 
@@ -931,6 +939,7 @@ function renderResultado(result, container) {
   const posture  = kpis.posture  || {};
   const objects  = kpis.objects  || {};
   const videoInfo = result.video_info || {};
+  const competenciasMbdd = result.competencias_mbdd?.competencias || {};
   const struct   = clar.structure || {};
   const tags   = buildTags(interp);
   const resumenEjecutivo = ev.resumen_ejecutivo || '—';
@@ -1038,6 +1047,11 @@ function renderResultado(result, container) {
 
   ${buildLeyendaSection()}
 
+  <div class="section-label">Competencias del Marco de Buen Desempeño Docente evidenciadas</div>
+  <div class="card" style="padding:14px 18px;margin-bottom:16px">
+    ${buildCompetenciasMbddSection(competenciasMbdd)}
+  </div>
+
   <div class="section-label">Rúbrica de contenido pedagógico</div>
   <div class="card" style="padding:16px 20px">
     ${buildRubricaSection(criterios)}
@@ -1091,6 +1105,52 @@ function buildLeyendaSection() {
       </table>
     </div>
   </div>`;
+}
+
+const EVIDENCIA_COLOR = {
+  'sí':                          '#16A34A',
+  'evidencia parcial':           '#F59E0B',
+  'sin evidencia en esta sesión': '#94A3B8',
+  'no evaluado':                 '#94A3B8',
+};
+
+function buildCompetenciasMbddSection(competenciasMbdd) {
+  const entries = Object.entries(competenciasMbdd || {});
+  if (!entries.length) {
+    return `<div style="color:var(--texto-3);font-size:12px">No hay análisis de competencias MBDD disponible.</div>`;
+  }
+
+  const dominios = [
+    { id: 'D1', nombre: 'Preparación para el aprendizaje de los estudiantes' },
+    { id: 'D2', nombre: 'Enseñanza para el aprendizaje de los estudiantes' },
+    { id: 'D3', nombre: 'Participación en la gestión de la escuela articulada a la comunidad' },
+    { id: 'D4', nombre: 'Desarrollo de la profesionalidad y la identidad docente' },
+  ];
+
+  return dominios.map(dom => {
+    const items = entries.filter(([, c]) => c.dominio === dom.id);
+    if (!items.length) return '';
+
+    const filas = items.map(([id, c]) => {
+      const etiqueta = (c.evidencia === 'sí' && c.fuerza && c.fuerza !== 'no aplica')
+        ? `${c.evidencia} · ${c.fuerza}`
+        : c.evidencia;
+      return `
+      <div style="padding:8px 0;border-bottom:1px solid var(--borde)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;gap:8px">
+          <span style="font-size:12.5px;font-weight:500;color:var(--texto)">${id} · ${c.nombre}</span>
+          <span class="badge" style="background:${EVIDENCIA_COLOR[c.evidencia]}22;color:${EVIDENCIA_COLOR[c.evidencia]};white-space:nowrap">${etiqueta}</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--texto-2)">${c.justificacion || '—'}</div>
+      </div>`;
+    }).join('');
+
+    return `
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:600;color:var(--texto-3);text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">${dom.id} · ${dom.nombre}</div>
+        ${filas}
+      </div>`;
+  }).join('');
 }
 
 const NIVEL_COLOR = {

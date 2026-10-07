@@ -15,9 +15,6 @@ mp_pose     = mp.solutions.pose
 YOLO_MODEL      = os.getenv("YOLO_MODEL", "yolo26n.pt")
 YOLO_CONF       = float(os.getenv("YOLO_CONF", "0.35"))
 
-# Frames por segundo REAL a los que se muestrea el video para YOLO.
-# Se mantiene igual a la tasa de MediaPipe (1 fps, ver extract_frames) para que
-# ambos análisis (postura y objetos) queden alineados sobre la misma línea de tiempo.
 YOLO_SAMPLE_FPS = float(os.getenv("YOLO_SAMPLE_FPS", "1"))
 
 OBJECT_CLASS_MAP: dict[int, dict] = {
@@ -34,12 +31,6 @@ OBJECT_CLASS_MAP: dict[int, dict] = {
     0:  {"label": "Persona",               "categoria": "Personas"},
 }
 
-# Categoría institucional por NOMBRE de clase (no por ID) para el modelo custom
-# (.onnx). Los nombres de clase se leen directamente de la metadata embebida en
-# el propio modelo (model.names) en vez de mantener un mapa de IDs a mano — un
-# mapa por ID se desincroniza fácilmente si el modelo se reentrena/reexporta
-# con otro orden de clases (fue justamente el bug que causaba "Celular" sobre
-# personas: el ID 2 del modelo real es "Persona", no "Celular").
 CATEGORIA_POR_LABEL: dict[str, str] = {
     "Persona":                  "Personas",
     "Pizarra":                  "Recursos didácticos",
@@ -226,6 +217,7 @@ def analyze_posture(video_path: str, frames_folder: str) -> dict:
     if not frames:
         return {"error": "No se pudieron extraer frames del video"}
 
+    frames_muestreados = len(frames)
     results = []
 
     with mp_pose.Pose(
@@ -251,7 +243,11 @@ def analyze_posture(video_path: str, frames_folder: str) -> dict:
         pass
 
     if not results:
-        return {"error": "No se detectó persona en el video"}
+        return {
+            "error": "No se detectó persona en el video",
+            "frames_muestreados":  frames_muestreados,
+            "frames_con_persona":  0,
+        }
 
     total = len(results)
 
@@ -306,7 +302,17 @@ def analyze_posture(video_path: str, frames_folder: str) -> dict:
     ]
 
     return {
+        # frames_analizados se mantiene por compatibilidad con el frontend
+        # (index.html lo usa tal cual); significa lo mismo que
+        # frames_con_persona — frames donde MediaPipe detectó una persona.
+        # frames_muestreados es el total de frames sacados a 1 FPS, SIN
+        # importar si se detectó algo — permite calcular cuántos se
+        # descartaron por no encontrar persona (frames_muestreados -
+        # frames_con_persona), útil para pruebas de coherencia internas.
         "frames_analizados":   total,
+        "frames_muestreados":  frames_muestreados,
+        "frames_con_persona":  total,
+        "tasa_deteccion":      round(total / frames_muestreados, 3) if frames_muestreados else 0.0,
         "postura_score":       postura_score,
         "estabilidad_score":   estabilidad_score,
         "centrado_score":      centrado_score,
@@ -328,14 +334,19 @@ def analyze_posture(video_path: str, frames_folder: str) -> dict:
 # Sección de detección de objetos con YOLOv8
 #------------------------------------------------------------
 
+_yolo_model = None
+
 def _load_yolo():
     """
-    Carga el modelo YOLO de forma lazy.
-    Separado en función para facilitar mocking en tests
-    y evitar el import al nivel de módulo (pesa ~200ms).
+    Carga el modelo YOLO una sola vez por proceso y lo cachea (mismo patrón
+    que get_model() en services/transcription/analyzer.py para Whisper).
+    Sin esto, cada análisis recargaba el modelo desde disco desde cero.
     """
-    from ultralytics import YOLO
-    return YOLO(YOLO_MODEL, task="detect")
+    global _yolo_model
+    if _yolo_model is None:
+        from ultralytics import YOLO
+        _yolo_model = YOLO(YOLO_MODEL, task="detect")
+    return _yolo_model
  
  
 def detect_objects_in_frame(model, frame: np.ndarray, conf: float = YOLO_CONF) -> list[dict]:

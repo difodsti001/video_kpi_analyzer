@@ -9,7 +9,9 @@ FFMPEG_PATH   = os.getenv("FFMPEG_PATH", "ffmpeg")
 print("Usando FFMPEG:", FFMPEG_PATH)
 CHUNK_SECONDS = int(os.getenv("CHUNK_SECONDS", 600))
 
-from services.transcription.analyzer import transcribe_audio, parse_words, get_duration
+from services.transcription.analyzer import (
+    transcribe_audio, parse_words, parse_segment_quality, evaluar_calidad_transcripcion, get_duration,
+)
 from services.speech_time.analyzer   import analyze_speech_time
 from services.rhythm.analyzer        import analyze_rhythm
 from services.rhythm.audio_analyzer  import analyze_audio
@@ -17,6 +19,9 @@ from services.sentiment.analyzer     import analyze_sentiment
 from services.clarity.analyzer       import analyze_clarity
 from services.video.analyzer import analyze_posture, analyze_objects, get_video_info
 from services.evaluacion.analyzer    import evaluar_docente
+from services.feedback.analyzer      import construir_interpretaciones
+from services.competencias_mbdd.analyzer import detectar_competencias
+from services.cursos.registro        import obtener_curso, CURSO_POR_DEFECTO
 
 TEMP_FOLDER = os.getenv("TEMP_FOLDER", "./temp")
 os.makedirs(TEMP_FOLDER, exist_ok=True)
@@ -37,7 +42,13 @@ def _serialize(obj):
         return obj.tolist()
     return obj
 
-class VideoAnalyzer:
+
+# ══════════════════════════════════════════════════════════════════
+# EXTRACCIÓN — la parte cara (Whisper, KPIs, postura, objetos).
+# No depende de ningún curso/rúbrica, se corre una sola vez por video.
+# ══════════════════════════════════════════════════════════════════
+
+class Extractor:
 
     def __init__(self, video_path: str):
         self.video_path = video_path
@@ -48,6 +59,8 @@ class VideoAnalyzer:
         self.all_words  = []
         self.transcript = ""
         self.duration   = 0.0
+        self.transcription_quality = []
+        self.transcription_calidad = {}
 
         # KPIs
         self.speech   = {}
@@ -57,7 +70,6 @@ class VideoAnalyzer:
         self.audio    = {}
         self.posture = {}
         self.objects   = {}
-        self.evaluacion = {}
         self.video_info = {}
 
     # ── audio ────────────────────────────────────────────────────
@@ -66,8 +78,12 @@ class VideoAnalyzer:
         output_wav = os.path.join(TEMP_FOLDER, f"audio_{uuid.uuid4().hex[:8]}.wav")
         subprocess.run([
             FFMPEG_PATH, "-y", "-i", self.video_path,
+            # Normaliza el volumen (muchos videos de aula tienen el micrófono
+            # lejos del docente) — mejora tanto la transcripción como el
+            # análisis de pitch/energía, que usan este mismo wav.
+            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
             "-ac", "1", "-ar", "16000", "-vn", output_wav
-        ], 
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL, check=True)
         self.wav_path = output_wav
@@ -92,17 +108,25 @@ class VideoAnalyzer:
     def transcribe(self) -> tuple[list, str]:
         all_words      = []
         all_text_parts = []
+        all_quality    = []
         for i, chunk in enumerate(self.chunks):
             offset = i * CHUNK_SECONDS
-            result = transcribe_audio(chunk, model_size=os.getenv("WHISPER_MODEL", "base"))
-            words  = parse_words(result["segments"])
+            result  = transcribe_audio(chunk, model_size=os.getenv("WHISPER_MODEL", "base"))
+            words   = parse_words(result["segments"])
+            quality = parse_segment_quality(result["segments"])
             for w in words:
                 w["start"] += offset
                 w["end"]   += offset
+            for q in quality:
+                q["start"] += offset
+                q["end"]   += offset
             all_words.extend(words)
+            all_quality.extend(quality)
             all_text_parts.append(result["text"].strip())
         self.all_words  = all_words
         self.transcript = " ".join(all_text_parts)
+        self.transcription_quality = all_quality
+        self.transcription_calidad = evaluar_calidad_transcripcion(all_quality)
         return self.all_words, self.transcript
 
     # ── KPIs ─────────────────────────────────────────────────────
@@ -126,13 +150,6 @@ class VideoAnalyzer:
     def run_audio(self) -> dict:
         self.audio = analyze_audio(self.wav_path)
         return self.audio
-
-    def run_evaluacion(self) -> dict:
-        self.evaluacion = evaluar_docente(
-            self.transcript, self.speech, self.rhythm, self.sentiment,
-            self.clarity, self.audio, self.objects
-        )
-        return self.evaluacion
 
     def run_video_info(self) -> dict:
         self.video_info = get_video_info(self.video_path)
@@ -174,7 +191,6 @@ class VideoAnalyzer:
             self.run_audio()
             self.run_posture()
             self.run_objects()
-            self.run_evaluacion()
         finally:
             self.cleanup()
 
@@ -185,6 +201,8 @@ class VideoAnalyzer:
             "duration_seconds": self.duration,
             "total_words":      len(self.all_words),
             "transcript":       self.transcript,
+            "transcription_quality": self.transcription_quality,
+            "transcription_calidad": self.transcription_calidad,
             "video_info":       self.video_info,
             "kpis": {
                 "speech_time": self.speech,
@@ -195,6 +213,47 @@ class VideoAnalyzer:
                 "posture": self.posture,
                 "objects":     self.objects,
             },
-            "evaluacion": self.evaluacion,
         }
         return _serialize(raw)
+
+
+# ══════════════════════════════════════════════════════════════════
+# EVALUACIÓN — la parte barata (rúbrica + competencias MBDD, vía LLM).
+# Toma una extracción YA HECHA + un curso, y se puede repetir las veces
+# que haga falta sin volver a pagar el costo de la extracción.
+# ══════════════════════════════════════════════════════════════════
+
+def evaluar_extraccion(extraccion: dict, curso_id: str = CURSO_POR_DEFECTO) -> dict:
+    """
+    extraccion: el dict que devuelve Extractor.result() (o lo que quedó
+    guardado en la columna `result` de la tabla `extracciones`).
+    curso_id: qué configuración de curso aplicar (ver services/cursos/registro.py).
+    """
+    curso = obtener_curso(curso_id)
+
+    transcript = extraccion.get("transcript", "")
+    kpis       = extraccion.get("kpis", {})
+    speech     = kpis.get("speech_time", {})
+    rhythm     = kpis.get("rhythm", {})
+    sentiment  = kpis.get("sentiment", {})
+    clarity    = kpis.get("clarity", {})
+    audio      = kpis.get("audio", {})
+    objects    = kpis.get("objects", {})
+
+    evaluacion = evaluar_docente(
+        transcript, speech, rhythm, sentiment, clarity, audio, objects,
+        criterios_rubrica = curso["criterios"],
+        peso_contenido    = curso["peso_contenido"],
+        peso_forma        = curso["peso_forma"],
+    )
+
+    interpretaciones = construir_interpretaciones(speech, rhythm, sentiment, clarity, audio)
+    resumen_kpis     = {k: v["resumen"] for k, v in interpretaciones.items()}
+    competencias_mbdd = detectar_competencias(transcript, resumen_kpis, objects)
+
+    return _serialize({
+        "curso_id":    curso["id"],
+        "curso_nombre": curso["nombre"],
+        "evaluacion":  evaluacion,
+        "competencias_mbdd": competencias_mbdd,
+    })

@@ -1,17 +1,22 @@
 # services/evaluacion/analyzer.py
 # Evaluación integral del docente en acción: una sola llamada LLM que juzga
-# la rúbrica de contenido (C1-C6) y redacta el resumen ejecutivo, cruzando
+# la rúbrica de contenido del curso y redacta el resumen ejecutivo, cruzando
 # esa lectura con los KPIs de oratoria (calculados por reglas) y los
 # recursos/objetos detectados en el video.
+#
+# La rúbrica (criterios/niveles/pesos) y la ponderación contenido/forma ya
+# NO son fijas acá — las define el curso (ver shared.models.RubricaCurso /
+# services.cursos.registro) y se reciben como parámetro, para que distintos
+# cursos puedan evaluar con criterios distintos sin tocar este archivo.
 import json
 import re
 
-from services.llm.client import llamar_llm
+from services.llm.client import llamar_llm, DEBUG_LLM_PROMPTS
 from services.feedback.analyzer import construir_interpretaciones, calcular_score_global
-from services.evaluacion.rubrica_data import RUBRICA, NIVEL_VALOR
 
-PESO_CONTENIDO = 0.70   # score_rubrica  (0-20)
-PESO_FORMA     = 0.30   # score_oratoria (0-10, escalado a 0-20)
+# I-ED-L-D → 1-4. Esto sí es fijo: es la escala de niveles del proyecto, no
+# algo que varíe por curso (lo que varía es QUÉ describe cada nivel).
+NIVEL_VALOR = {"inicio": 1, "en desarrollo": 2, "logrado": 3, "destacado": 4}
 
 
 # ── 1. EVIDENCIA ──────────────────────────────────────────────────
@@ -44,14 +49,14 @@ def _bloque_criterio(c: dict) -> str:
     )
 
 
-def construir_prompt_evaluacion(evidencia: dict, score_oratoria: float) -> str:
-    criterios_txt = "\n\n".join(_bloque_criterio(c) for c in RUBRICA)
+def construir_prompt_evaluacion(evidencia: dict, score_oratoria: float, criterios_rubrica: list[dict]) -> str:
+    criterios_txt = "\n\n".join(_bloque_criterio(c) for c in criterios_rubrica)
     kpis_txt      = "\n".join(f"- {k}: {v}" for k, v in evidencia["resumen_kpis"].items())
     objetos_txt   = "; ".join(evidencia["objetos_detectados"]) or "no se detectaron objetos relevantes"
 
     ids_json = ",\n  ".join(
         f'"{c["id"]}": {{"nivel": "Inicio|En desarrollo|Logrado|Destacado", "justificacion": "..."}}'
-        for c in RUBRICA
+        for c in criterios_rubrica
     )
 
     return f"""Eres un evaluador pedagógico. Tu tarea es evaluar a un docente en acción a partir de la \
@@ -67,8 +72,8 @@ justificando con datos concretos.
 PASO 2 — Redacta un resumen ejecutivo amplio y detallado en español (7-9 párrafos, prosa fluida, sin \
 listas ni viñetas) que desarrolle en profundidad:
 (1) si el docente cumple con los lineamientos y el propósito de la clase, con contexto de qué se enseñó;
-(2) un repaso criterio por criterio de la rúbrica (C1 a C6), explicando el porqué de cada nivel asignado \
-   y no solo repitiendo la justificación breve;
+(2) un repaso criterio por criterio de la rúbrica, explicando el porqué de cada nivel asignado y no solo \
+   repitiendo la justificación breve;
 (3) fortalezas de contenido pedagógico con ejemplos concretos citados o parafraseados de la transcripción;
 (4) debilidades de contenido pedagógico, igualmente con ejemplos concretos;
 (5) análisis de la oratoria (ritmo, tiempo de habla, claridad, tono emocional, expresividad vocal) y qué \
@@ -112,7 +117,7 @@ def _extraer_json(texto: str) -> dict:
     return json.loads(match.group(0))
 
 
-def parsear_respuesta(raw: str | None) -> tuple[dict, str]:
+def parsear_respuesta(raw: str | None, criterios_rubrica: list[dict]) -> tuple[dict, str]:
     try:
         data = _extraer_json(raw)
     except Exception:
@@ -120,7 +125,7 @@ def parsear_respuesta(raw: str | None) -> tuple[dict, str]:
 
     criterios_raw = data.get("criterios", {}) if isinstance(data, dict) else {}
     criterios = {}
-    for c in RUBRICA:
+    for c in criterios_rubrica:
         entry = criterios_raw.get(c["id"], {}) if isinstance(criterios_raw, dict) else {}
         nivel = entry.get("nivel", "no evaluado") if isinstance(entry, dict) else "no evaluado"
         criterios[c["id"]] = {
@@ -154,7 +159,8 @@ def calcular_score_rubrica(criterios: dict) -> float | None:
     return round((total_valor / total_peso) * 20, 2)
 
 
-def calcular_score_final(score_rubrica: float | None, score_oratoria: float) -> float:
+def calcular_score_final(score_rubrica: float | None, score_oratoria: float,
+                         peso_contenido: float, peso_forma: float) -> float:
     """Combina contenido (0-20) y forma (0-10 -> 0-20) en un score vigesimal final."""
     contenido = score_rubrica if score_rubrica is not None else 0.0
     forma     = score_oratoria * 2
@@ -162,32 +168,36 @@ def calcular_score_final(score_rubrica: float | None, score_oratoria: float) -> 
     if score_rubrica is None:
         return round(forma, 2)   # sin evaluación de contenido, no se puede ponderar
 
-    return round(contenido * PESO_CONTENIDO + forma * PESO_FORMA, 2)
+    return round(contenido * peso_contenido + forma * peso_forma, 2)
 
 
 # ── 5. FUNCIÓN PRINCIPAL ─────────────────────────────────────────
 
 def evaluar_docente(transcript: str, speech: dict, rhythm: dict, sentiment: dict,
-                    clarity: dict, audio: dict, objetos: dict) -> dict:
+                    clarity: dict, audio: dict, objetos: dict,
+                    criterios_rubrica: list[dict],
+                    peso_contenido: float = 0.70, peso_forma: float = 0.30) -> dict:
     interpretaciones = construir_interpretaciones(speech, rhythm, sentiment, clarity, audio)
     score_oratoria   = calcular_score_global(interpretaciones)
 
     evidencia = construir_evidencia(transcript, interpretaciones, objetos)
-    prompt    = construir_prompt_evaluacion(evidencia, score_oratoria)
+    prompt    = construir_prompt_evaluacion(evidencia, score_oratoria, criterios_rubrica)
     raw       = llamar_llm(prompt, max_tokens=3000)
 
-    criterios, resumen_ejecutivo = parsear_respuesta(raw)
+    criterios, resumen_ejecutivo = parsear_respuesta(raw, criterios_rubrica)
     score_rubrica = calcular_score_rubrica(criterios)
-    score_final   = calcular_score_final(score_rubrica, score_oratoria)
+    score_final   = calcular_score_final(score_rubrica, score_oratoria, peso_contenido, peso_forma)
 
-    return {
+    resultado = {
         "score_final":               score_final,
         "score_rubrica":             score_rubrica,
         "score_oratoria":            score_oratoria,
         "escala":                    "vigesimal (0-20)",
-        "ponderacion":               {"contenido": PESO_CONTENIDO, "forma": PESO_FORMA},
+        "ponderacion":               {"contenido": peso_contenido, "forma": peso_forma},
         "criterios":                 criterios,
         "interpretaciones_oratoria": interpretaciones,
         "resumen_ejecutivo":         resumen_ejecutivo,
-        "prompt_usado":              prompt,
     }
+    if DEBUG_LLM_PROMPTS:
+        resultado["prompt_usado"] = prompt
+    return resultado

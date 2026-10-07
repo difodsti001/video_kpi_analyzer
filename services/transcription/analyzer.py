@@ -45,25 +45,102 @@ def transcribe_audio(wav_path: str, model_size: str = "small") -> dict:
     result = model.transcribe(
         wav_path,
         word_timestamps=True,
-        language="es"
+        language="es",
+        # Sin esto, un segmento mal transcrito (ruido, voces superpuestas)
+        # "contagia" su error a los siguientes.
+        condition_on_previous_text=False,
     )
 
     return result
 
 
 def parse_words(segments: list) -> list[dict]:
-    """Extrae lista plana de {word, start, end} desde segments de Whisper."""
+    """Extrae lista plana de {word, start, end, probability} desde segments de Whisper."""
     words = []
 
     for seg in segments:
         for w in seg.get("words", []):
+            prob = w.get("probability")
             words.append({
                 "word": w["word"].strip(),
                 "start": round(w["start"], 3),
                 "end": round(w["end"], 3),
+                "probability": round(prob, 4) if prob is not None else None,
             })
 
     return words
+
+
+def parse_segment_quality(segments: list) -> list[dict]:
+    """
+    Señales de confianza por segmento que Whisper ya calcula internamente
+    (antes se descartaban): avg_logprob (qué tan segura estuvo la decodificación),
+    no_speech_prob (probabilidad de que el segmento sea silencio/ruido sin habla)
+    y compression_ratio (valores altos sugieren texto repetitivo — señal de
+    alucinación). Es la base para detectar, más adelante, qué videos tienen
+    extracción poco confiable.
+    """
+    quality = []
+
+    for seg in segments:
+        quality.append({
+            "start":             round(seg["start"], 3),
+            "end":               round(seg["end"], 3),
+            "avg_logprob":       round(seg.get("avg_logprob", 0.0), 4),
+            "no_speech_prob":    round(seg.get("no_speech_prob", 0.0), 4),
+            "compression_ratio": round(seg.get("compression_ratio", 0.0), 4),
+        })
+
+    return quality
+
+
+# Umbrales por segmento — son los mismos defaults internos que usa
+# openai-whisper (logprob_threshold, compression_ratio_threshold,
+# no_speech_threshold) para decidir si reintentar un segmento con otra
+# temperatura de decodificación. No son un número elegido a ojo: es la
+# definición operacional de "segmento no confiable" del propio modelo,
+# reutilizada también por faster-whisper y WhisperX.
+LOGPROB_THRESHOLD           = -1.0
+COMPRESSION_RATIO_THRESHOLD = 2.4
+NO_SPEECH_THRESHOLD         = 0.6
+
+
+def evaluar_calidad_transcripcion(quality_segments: list[dict]) -> dict:
+    """
+    Agrega las señales de confianza por segmento en un veredicto por video.
+    El umbral POR SEGMENTO viene de Whisper (arriba). El umbral POR VIDEO
+    (qué % de segmentos problemáticos alcanza para marcar el video entero
+    como poco confiable) sí es específico de este proyecto — no hay un
+    número universal en la literatura para esto, así que se deja
+    configurable (QUALITY_PCT_THRESHOLD) para poder calibrarlo con datos
+    propios en vez de asumirlo.
+    """
+    if not quality_segments:
+        return {
+            "total_segmentos":    0,
+            "segmentos_problema": 0,
+            "pct_problema":       None,
+            "umbral_pct":         None,
+            "confiable":          None,
+        }
+
+    problema = [
+        q for q in quality_segments
+        if q["avg_logprob"] < LOGPROB_THRESHOLD
+        or q["compression_ratio"] > COMPRESSION_RATIO_THRESHOLD
+        or q["no_speech_prob"] > NO_SPEECH_THRESHOLD
+    ]
+
+    pct_problema = round(100 * len(problema) / len(quality_segments), 1)
+    umbral       = float(os.getenv("QUALITY_PCT_THRESHOLD", "25"))
+
+    return {
+        "total_segmentos":    len(quality_segments),
+        "segmentos_problema": len(problema),
+        "pct_problema":       pct_problema,
+        "umbral_pct":         umbral,
+        "confiable":          pct_problema <= umbral,
+    }
 
 
 def get_duration(wav_path: str) -> float:
