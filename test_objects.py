@@ -12,8 +12,9 @@ import cv2
 from dotenv import load_dotenv
 load_dotenv()
 
-from services.video.analyzer import (
-    get_video_info, analyze_objects, _load_yolo, detect_objects_in_frame,
+from services.extractions.video_info.analyzer import get_video_info
+from services.extractions.objects.analyzer import (
+    analyze_objects, _load_yolo, detect_objects_in_frame,
     YOLO_SAMPLE_FPS, YOLO_CONF,
 )
 

@@ -3,11 +3,9 @@
 # sesión, a partir de la transcripción y la evidencia ya disponible en el
 # pipeline. Pensado como una pieza que refuerza la retroalimentación al
 # docente: le muestra en qué competencias del marco se reconoce su práctica.
-import json
-import re
-
-from services.llm.client import llamar_llm, DEBUG_LLM_PROMPTS
-from services.competencias_mbdd.mbdd_data import (
+from services.transversal.llm.client import llamar_llm, DEBUG_LLM_PROMPTS
+from services.transversal.llm.json_response import extraer_json
+from services.evaluations.competencias_mbdd.mbdd_data import (
     COMPETENCIAS_MBDD, DOMINIOS, NIVELES_EVIDENCIA, NIVELES_FUERZA, FUERZA_NO_APLICA,
 )
 
@@ -85,17 +83,12 @@ Responde ÚNICAMENTE con un JSON válido, sin texto adicional antes ni después,
 
 
 # ── 3. PARSEO DEFENSIVO ──────────────────────────────────────────
-
-def _extraer_json(texto: str) -> dict:
-    match = re.search(r"\{.*\}", texto or "", re.S)
-    if not match:
-        raise ValueError("No se encontró JSON en la respuesta del LLM")
-    return json.loads(match.group(0))
-
+# extraer_json() vive en services/transversal/llm/json_response.py,
+# compartida con evaluacion/ y cualquier otro servicio de evaluación futuro.
 
 def parsear_respuesta(raw: str | None) -> dict:
     try:
-        data = _extraer_json(raw)
+        data = extraer_json(raw)
     except Exception:
         data = {}
 

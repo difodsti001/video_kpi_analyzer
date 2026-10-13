@@ -8,11 +8,9 @@
 # NO son fijas acá — las define el curso (ver shared.models.RubricaCurso /
 # services.cursos.registro) y se reciben como parámetro, para que distintos
 # cursos puedan evaluar con criterios distintos sin tocar este archivo.
-import json
-import re
-
-from services.llm.client import llamar_llm, DEBUG_LLM_PROMPTS
-from services.feedback.analyzer import construir_interpretaciones, calcular_score_global
+from services.transversal.llm.client import llamar_llm, DEBUG_LLM_PROMPTS
+from services.transversal.llm.json_response import extraer_json
+from services.transversal.feedback.analyzer import construir_interpretaciones, calcular_score_global
 
 # I-ED-L-D → 1-4. Esto sí es fijo: es la escala de niveles del proyecto, no
 # algo que varíe por curso (lo que varía es QUÉ describe cada nivel).
@@ -109,17 +107,11 @@ Responde ÚNICAMENTE con un JSON válido, sin texto adicional antes ni después,
 
 
 # ── 3. PARSEO DEFENSIVO ──────────────────────────────────────────
-
-def _extraer_json(texto: str) -> dict:
-    match = re.search(r"\{.*\}", texto or "", re.S)
-    if not match:
-        raise ValueError("No se encontró JSON en la respuesta del LLM")
-    return json.loads(match.group(0))
-
+# extraer_json() vive en services/transversal/llm/json_response.py
 
 def parsear_respuesta(raw: str | None, criterios_rubrica: list[dict]) -> tuple[dict, str]:
     try:
-        data = _extraer_json(raw)
+        data = extraer_json(raw)
     except Exception:
         data = {}
 
@@ -166,7 +158,7 @@ def calcular_score_final(score_rubrica: float | None, score_oratoria: float,
     forma     = score_oratoria * 2
 
     if score_rubrica is None:
-        return round(forma, 2)   # sin evaluación de contenido, no se puede ponderar
+        return round(forma, 2)
 
     return round(contenido * peso_contenido + forma * peso_forma, 2)
 

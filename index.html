@@ -927,9 +927,7 @@ function verResultado() {
 function renderResultado(result, container) {
   const detailId = 'result-detail';
   const ev = result.evaluacion || {};
-  const score = ev.score_final || 0;
   const interp = ev.interpretaciones_oratoria || {};
-  const criterios = ev.criterios || {};
   const kpis   = result.kpis || {};
   const speech = kpis.speech_time || {};
   const rhythm = kpis.rhythm || {};
@@ -944,23 +942,18 @@ function renderResultado(result, container) {
   const tags   = buildTags(interp);
   const resumenEjecutivo = ev.resumen_ejecutivo || '—';
 
-  const nivelFinal = getScoreNivel(score);
-
+  // Nota: no se muestra puntaje ni nivel (Inicio/En desarrollo/Logrado/
+  // Destacado) — esto no es una calificación hacia el docente, es una ruta
+  // de retroalimentación. La rúbrica sigue calculándose igual que antes
+  // para análisis pedagógico interno; solo se deja de exponer acá.
   const heroHtml = `
   <div class="score-hero">
-    <div class="score-circle" style="background:${NIVEL_COLOR[nivelFinal]}">
-      <div class="score-num">${score.toFixed(1)}</div>
-      <div class="score-denom">/ 20</div>
-      <div class="sc-tip">Puntaje de referencia (70% contenido + 30% forma) usado para asignar el nivel.<br>Contenido: ${fmtVal(ev.score_rubrica,1)}/20 · Oratoria: ${fmtVal(ev.score_oratoria,1)}/10</div>
-    </div>
     <div style="flex:1">
-      <div class="score-label" style="color:${NIVEL_COLOR[nivelFinal]}">${nivelFinal}</div>
-      <div class="score-desc">${getScoreDesc(score)}</div>
       <div class="score-tags">${tags}</div>
     </div>
   </div>
 
-  <div class="section-label">Resumen ejecutivo</div>
+  <div class="section-label">Retroalimentación</div>
   <div class="card">
     <div class="feedback-box">${resumenEjecutivo.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>')}</div>
   </div>`;
@@ -1050,11 +1043,6 @@ function renderResultado(result, container) {
   <div class="section-label">Competencias del Marco de Buen Desempeño Docente evidenciadas</div>
   <div class="card" style="padding:14px 18px;margin-bottom:16px">
     ${buildCompetenciasMbddSection(competenciasMbdd)}
-  </div>
-
-  <div class="section-label">Rúbrica de contenido pedagógico</div>
-  <div class="card" style="padding:16px 20px">
-    ${buildRubricaSection(criterios)}
   </div>`;
 
   container.innerHTML = `${heroHtml}
@@ -1494,7 +1482,6 @@ async function loadHistorial() {
     }
 
     const rows = jobs.map(j => {
-      const score = j.score != null ? j.score.toFixed(1) : '—';
       const fecha = j.created_at
         ? new Date(j.created_at).toLocaleDateString('es-PE')
         : '—';
@@ -1504,7 +1491,6 @@ async function loadHistorial() {
         <td>${j.presentador || '—'}</td>
         <td>${j.tipo || '—'}</td>
         <td>${fecha}</td>
-        <td style="text-align:right">${score}</td>
         <td style="text-align:right">
           <button class="btn-sm">Ver</button>
         </td>
@@ -1519,7 +1505,6 @@ async function loadHistorial() {
             <th>Presentador</th>
             <th>Tipo</th>
             <th>Fecha</th>
-            <th style="text-align:right">Score</th>
             <th></th>
           </tr>
         </thead>

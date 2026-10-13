@@ -1,6 +1,7 @@
 import subprocess
 import tempfile
 import os
+import threading
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,12 +10,21 @@ FFMPEG_PATH  = os.getenv("FFMPEG_PATH", "ffmpeg")
 FFPROBE_PATH = os.getenv("FFPROBE_PATH", "ffprobe")
 
 _model = None
+_model_lock = threading.Lock()
 
 def get_model(model_size: str = "small"):
+    """Carga el modelo una sola vez por proceso (patrón cache). Con
+    MAX_CONCURRENT_ANALYSIS > 1, dos extracciones pueden llegar acá casi
+    al mismo tiempo — sin el lock, ambas pasan el "if _model is None" y
+    cargan el modelo en paralelo (dos cargas de PyTorch simultáneas, que
+    puede tumbar el proceso sin excepción capturable). El lock asegura que
+    solo una hebra cargue el modelo; las demás esperan y reciben el mismo."""
     global _model
     if _model is None:
-        import whisper
-        _model = whisper.load_model(model_size)
+        with _model_lock:
+            if _model is None:   # otra hebra pudo haber cargado mientras esperábamos el lock
+                import whisper
+                _model = whisper.load_model(model_size)
     return _model
 
 

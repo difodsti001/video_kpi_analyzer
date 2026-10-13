@@ -47,28 +47,33 @@ Todo se persiste en base de datos (PostgreSQL vía SQLAlchemy), con deduplicaci�
 
 ```text
 .
-├── main.py                    # API FastAPI: endpoints, colas, limpieza de jobs atascados
+├── main.py                    # API FastAPI: solo rutas
+├── jobs.py                    # Orquestación en segundo plano: cola, reintentos, limpieza de jobs atascados
 ├── core.py                    # Extractor (pipeline pesado) y evaluar_extraccion (pipeline de evaluación)
 ├── index.html                 # Frontend estático servido por la API
 ├── requirements.txt           # Dependencias Python
-├── Rubrica_propuesta.docx     # Documento fuente de la rúbrica de contenido pedagógico
 ├── ffmpeg.exe / ffprobe.exe    # Binarios usados por el pipeline (extracción de audio/frames y duración)
 ├── yolo26n.pt                 # Modelo YOLO base (COCO), usado si YOLO_MODEL no apunta a uno propio
 ├── sifods_v1_best.onnx        # Modelo YOLO propio entrenado para objetos educativos específicos
 ├── video/                     # Videos subidos, pendientes o en proceso de análisis
 ├── temp/                      # Archivos temporales (audio, chunks, frames) — se limpian al terminar
 ├── services/
-│   ├── clarity/                # Claridad del discurso (muletillas, etc.)
-│   ├── competencias_mbdd/      # Detección de evidencia de las 9 competencias del MBDD
-│   ├── cursos/                 # Resuelve qué rúbrica/ponderación aplica a cada curso (lee de la BD)
-│   ├── evaluacion/              # Evaluación de contenido pedagógico + resumen ejecutivo (vía LLM)
-│   ├── feedback/                # Interpretación y consolidación de los KPIs de oratoria
-│   ├── llm/                     # Cliente LLM (OpenAI / Azure / Anthropic / Gemini) con reintentos
-│   ├── rhythm/                  # Ritmo del habla y análisis acústico
-│   ├── sentiment/                # Sentimiento/tono emocional del discurso
-│   ├── speech_time/              # Tiempo de habla y proporción de habla
-│   ├── transcription/            # Transcripción con Whisper + señales de calidad por segmento
-│   └── video/                    # Ficha técnica, postura/gestos (MediaPipe) y objetos (YOLO)
+│   ├── extractions/            # Todo lo cuantitativo: se extrae del video/audio, no depende de ningún curso
+│   │   ├── transcription/      # Transcripción con Whisper + señales de calidad por segmento
+│   │   ├── speech_time/        # Tiempo de habla y proporción de habla
+│   │   ├── rhythm/              # Ritmo del habla y características acústicas
+│   │   ├── sentiment/            # Sentimiento/tono emocional del discurso
+│   │   ├── clarity/               # Claridad del discurso (muletillas, etc.)
+│   │   ├── posture/                # Postura/gestos (MediaPipe Pose)
+│   │   ├── objects/                 # Detección de objetos/recursos (YOLO, modelo COCO o propio)
+│   │   └── video_info/              # Ficha técnica del archivo (resolución, duración, peso)
+│   ├── evaluations/             # Todo lo cualitativo: juzga la extracción contra una rúbrica, vía LLM
+│   │   ├── evaluacion/           # Evaluación de contenido pedagógico + resumen ejecutivo
+│   │   └── competencias_mbdd/     # Detección de evidencia de las 9 competencias del MBDD
+│   └── transversal/             # Infraestructura y configuración que usan ambas capas, sin ser ninguna
+│       ├── llm/                   # Cliente LLM (OpenAI / Azure / Anthropic / Gemini) con reintentos
+│       ├── cursos/                 # Resuelve qué rúbrica/ponderación aplica a cada curso (lee de la BD)
+│       └── feedback/                # Interpretación por reglas (sin LLM) de los KPIs de oratoria
 ├── shared/
 │   ├── database.py              # Motor, sesión y base declarativa de SQLAlchemy
 │   └── models.py                 # Extraction, Evaluation y RubricaCurso (ver sección Base de datos)
@@ -81,18 +86,23 @@ Todo se persiste en base de datos (PostgreSQL vía SQLAlchemy), con deduplicaci�
 
 - `video/`: videos de entrada, tanto subidos vía `/analyze/upload` como colocados manualmente para `/analyze/from-file`.
 - `temp/`: archivos intermedios del pipeline (audio extraído, chunks, frames para postura/objetos). Se eliminan al finalizar el procesamiento, con éxito o con error.
-- `services/`: lógica especializada por indicador, cada subcarpeta con su propio analizador:
-  - `services/clarity/`: indicadores de claridad del discurso a partir de las palabras transcritas.
-  - `services/competencias_mbdd/`: evalúa evidencia de las 9 competencias oficiales del Marco del Buen Desempeño Docente (institución-wide, no varía por curso).
-  - `services/cursos/`: resuelve la configuración (rúbrica + ponderación) de un curso leyendo la tabla `rubricas_curso`; cae a `"default"` si el curso pedido no existe o está inactivo.
-  - `services/evaluacion/`: evalúa el contenido pedagógico contra la rúbrica del curso (recibida como parámetro, no fija) y redacta el resumen ejecutivo, cruzando esa lectura con los KPIs de oratoria y los objetos detectados.
-  - `services/feedback/`: combina los KPIs de discurso y audio en interpretaciones y un score de oratoria.
-  - `services/llm/`: encapsula la integración con el proveedor LLM configurado, con reintentos con backoff exponencial.
-  - `services/rhythm/`: ritmo del habla y características acústicas.
-  - `services/sentiment/`: sentimiento/tono general del discurso.
-  - `services/speech_time/`: tiempo hablado y su relación con la duración total del video.
-  - `services/transcription/`: transcribe con Whisper, captura `avg_logprob`/`no_speech_prob`/`compression_ratio` por segmento y evalúa la confiabilidad agregada de la transcripción.
-  - `services/video/`: ficha técnica del archivo, postura/gestos (MediaPipe Pose) y detección de objetos (YOLO, modelo COCO o propio).
+- `services/`: organizado en 3 capas, para poder tocar una sin arriesgar las otras:
+  - **`services/extractions/`** — lo que se calcula directamente del video/audio, sin depender de ningún curso o rúbrica:
+    - `transcription/`: transcribe con Whisper, captura `avg_logprob`/`no_speech_prob`/`compression_ratio` por segmento y evalúa la confiabilidad agregada de la transcripción.
+    - `speech_time/`: tiempo hablado y su relación con la duración total del video.
+    - `rhythm/`: ritmo del habla y características acústicas.
+    - `sentiment/`: sentimiento/tono general del discurso.
+    - `clarity/`: indicadores de claridad del discurso a partir de las palabras transcritas.
+    - `posture/`: postura y gestos vía MediaPipe Pose.
+    - `objects/`: detección de objetos/recursos educativos vía YOLO.
+    - `video_info/`: ficha técnica del archivo (resolución, duración, peso).
+  - **`services/evaluations/`** — lo que juzga la extracción ya hecha contra la rúbrica de un curso, vía LLM:
+    - `evaluacion/`: evalúa el contenido pedagógico contra la rúbrica del curso (recibida como parámetro, no fija) y redacta el resumen ejecutivo, cruzando esa lectura con los KPIs de oratoria y los objetos detectados.
+    - `competencias_mbdd/`: evalúa evidencia de las 9 competencias oficiales del Marco del Buen Desempeño Docente (institución-wide, no varía por curso).
+  - **`services/transversal/`** — infraestructura y configuración que usan ambas capas de arriba, sin ser ni extracción ni evaluación en sí:
+    - `llm/`: encapsula la integración con el proveedor LLM configurado, con reintentos con backoff exponencial — infraestructura, no un evaluador en sí.
+    - `cursos/`: resuelve la configuración (rúbrica + ponderación) de un curso leyendo la tabla `rubricas_curso`; cae a `"default"` si el curso pedido no existe o está inactivo.
+    - `feedback/`: combina los KPIs de discurso y audio en interpretaciones cualitativas (nivel, fortaleza) **por reglas fijas, sin LLM** — insumo para `evaluacion/` y `competencias_mbdd/`.
 - `shared/`: componentes compartidos por la API y el pipeline:
   - `shared/database.py`: motor, sesión (`SessionLocal`) y base declarativa de SQLAlchemy.
   - `shared/models.py`: `Extraction` (extracciones), `Evaluation` (evaluaciones) y `RubricaCurso` (rubricas_curso) — ver [Base de datos](#base-de-datos).
@@ -309,6 +319,6 @@ Al iniciar la aplicación, SQLAlchemy crea automáticamente las tablas necesaria
 - Si falla ffmpeg/ffprobe: revisa `FFMPEG_PATH`/`FFPROBE_PATH` y que los binarios sean accesibles.
 - Si falla PostgreSQL: verifica `DATABASE_URL` y que el servidor esté corriendo.
 - Si falla la detección visual: revisa `YOLO_MODEL`, `YOLO_CONF` y `YOLO_SAMPLE_FPS`.
-- Si la evaluación falla con error de curso: confirma que exista la fila `"default"` en `rubricas_curso` (ver `services/cursos/registro.py`).
+- Si la evaluación falla con error de curso: confirma que exista la fila `"default"` en `rubricas_curso` (ver `services/transversal/cursos/registro.py`).
 - Si la evaluación falla o no se genera el resumen ejecutivo: revisa que `LLM_PROVIDER` y las credenciales correspondientes estén configuradas.
 - Si hay errores de dependencias: vuelve a ejecutar `pip install -r requirements.txt`.

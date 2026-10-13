@@ -5,7 +5,6 @@ import uuid as uuid_lib
 import shutil
 import logging
 import warnings
-from datetime import datetime, timedelta
 
 from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, HTTPException, Depends, Header
 from fastapi.responses import FileResponse
@@ -25,8 +24,8 @@ warnings.filterwarnings("ignore")
 
 from shared.database import engine, get_db, Base
 from shared.models   import Extraction, Evaluation
-from core            import Extractor, evaluar_extraccion
-from services.cursos.registro import CURSO_POR_DEFECTO
+from services.transversal.cursos.registro import CURSO_POR_DEFECTO
+import jobs
 
 Base.metadata.create_all(bind=engine)
 
@@ -43,68 +42,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── control de acceso a los endpoints de análisis ──────────────────
-# Clave compartida simple (no hay sistema de usuarios): protege contra uso
-# público no autorizado de los endpoints que disparan cómputo pesado y
-# llamadas facturables al LLM. Falla cerrado: si no se configura API_KEY,
-# se rechazan todas las peticiones a esos endpoints.
+# Clave compartida para los endpoints de análisis. Falla cerrado: sin
+# API_KEY configurada, se rechazan todas las peticiones.
 API_KEY = os.getenv("API_KEY", "")
 
 def require_api_key(x_api_key: str = Header(default="")):
     if not API_KEY or x_api_key != API_KEY:
         raise HTTPException(401, "API key inválida o faltante (header X-API-Key)")
 
-# ── límite de análisis concurrentes ─────────────────────────────────
-# Cada extracción carga Whisper + YOLO + MediaPipe; sin límite, N uploads
-# simultáneos disparan N extracciones pesadas a la vez. El semáforo deja
-# correr como máximo MAX_CONCURRENT_ANALYSIS a la vez; los demás esperan su
-# turno en orden (cola FIFO implícita de asyncio). La evaluación (LLM) no
-# pasa por este semáforo — es barata comparada con la extracción.
-MAX_CONCURRENT_ANALYSIS = int(os.getenv("MAX_CONCURRENT_ANALYSIS", "2"))
-analysis_semaphore = asyncio.Semaphore(MAX_CONCURRENT_ANALYSIS)
-
-# ── limpieza de jobs atascados ──────────────────────────────────────
-# Si el proceso muere a mitad de una extracción/evaluación (crash, redeploy,
-# OOM), el registro se queda en "running" para siempre porque el
-# except/finally correspondiente nunca llega a ejecutarse. Este loop revisa
-# periódicamente y marca como "failed" lo que lleva "running" sin actividad.
-JOB_STALE_TIMEOUT_MIN    = int(os.getenv("JOB_STALE_TIMEOUT_MIN", "120"))
-JOB_CLEANUP_INTERVAL_SEC = int(os.getenv("JOB_CLEANUP_INTERVAL_SEC", "300"))
-
-def _cleanup_stale_jobs():
-    from shared.database import SessionLocal
-    db = SessionLocal()
-    try:
-        cutoff = datetime.utcnow() - timedelta(minutes=JOB_STALE_TIMEOUT_MIN)
-        mensaje = (
-            f"Marcado como fallido automáticamente: sin actividad por más de "
-            f"{JOB_STALE_TIMEOUT_MIN} minutos (probable caída del proceso)."
-        )
-        for Modelo in (Extraction, Evaluation):
-            stale = db.query(Modelo).filter(
-                Modelo.status == "running",
-                Modelo.updated_at < cutoff,
-            ).all()
-            for row in stale:
-                row.status = "failed"
-                row.error  = mensaje
-                logger.warning(f"[{row.id}] {Modelo.__tablename__} atascado en 'running' marcado como 'failed'")
-            if stale:
-                db.commit()
-    finally:
-        db.close()
-
-async def _cleanup_stale_jobs_loop():
-    while True:
-        await asyncio.sleep(JOB_CLEANUP_INTERVAL_SEC)
-        try:
-            _cleanup_stale_jobs()
-        except Exception as e:
-            logger.error(f"Error en limpieza de jobs atascados: {e}")
-
 @app.on_event("startup")
 async def _start_background_jobs():
-    asyncio.create_task(_cleanup_stale_jobs_loop())
+    asyncio.create_task(jobs.cleanup_stale_jobs_loop())
 
 
 # ── extracción (pesada) ─────────────────────────────────────────────
@@ -134,122 +82,6 @@ def _create_extraction(filename: str, video_path: str, db,
     return extraccion
 
 
-def _run_evaluation(evaluation_id: str, extraction_result: dict, curso_id: str):
-    """Corre evaluar_extraccion() y guarda el resultado en la fila Evaluation
-    correspondiente. Se usa tanto en el encadenamiento automático tras una
-    extracción exitosa, como en el endpoint para evaluar de nuevo."""
-    from shared.database import SessionLocal
-    db = SessionLocal()
-    try:
-        evaluacion = db.query(Evaluation).filter_by(id=evaluation_id).first()
-        evaluacion.status = "running"
-        db.commit()
-
-        resultado = evaluar_extraccion(extraction_result, curso_id)
-
-        evaluacion.status = "done"
-        evaluacion.result = resultado
-
-    except Exception as e:
-        logger.exception(f"[{evaluation_id}] Error evaluando")
-        evaluacion.status = "failed"
-        evaluacion.error  = str(e)
-
-    finally:
-        db.commit()
-        db.close()
-
-
-def _run_extraction(extraction_id: str, video_path: str):
-    from shared.database import SessionLocal
-    db = SessionLocal()
-
-    try:
-        logger.info(f"[{extraction_id}] Iniciando extracción — video: {video_path}")
-
-        extraccion = db.query(Extraction).filter_by(id=extraction_id).first()
-        extraccion.status = "running"
-        db.commit()
-
-        extractor = Extractor(video_path)
-        resultado = extractor.run()
-
-        extraccion.status = "done"
-        extraccion.result = resultado
-        db.commit()
-        logger.info(f"[{extraction_id}] Extracción completa")
-
-        # Auditoría interna de calidad de transcripción: queda en logs (y en
-        # transcription_calidad dentro del resultado, para quien arme una
-        # vista de auditoría más adelante), no se muestra en la interfaz —
-        # no es información que el docente/evaluador necesite ver de entrada.
-        calidad = resultado.get("transcription_calidad", {})
-        if calidad.get("confiable") is False:
-            logger.warning(
-                f"[{extraction_id}] Transcripción de baja confianza: "
-                f"{calidad.get('pct_problema')}% de segmentos problema "
-                f"({calidad.get('segmentos_problema')}/{calidad.get('total_segmentos')}), "
-                f"umbral={calidad.get('umbral_pct')}%"
-            )
-        elif calidad.get("confiable") is True:
-            logger.info(
-                f"[{extraction_id}] Transcripción confiable: "
-                f"{calidad.get('pct_problema')}% de segmentos problema "
-                f"({calidad.get('segmentos_problema')}/{calidad.get('total_segmentos')})"
-            )
-
-        # Política de retención: el video fuente ya no se necesita una vez que
-        # la extracción terminó (todo lo relevante quedó en extraccion.result).
-        # Borrarlo evita que el disco se llene indefinidamente. Solo se borra
-        # tras éxito — si la extracción falla, se conserva para depurar o
-        # reintentar manualmente.
-        try:
-            if os.path.exists(video_path):
-                os.remove(video_path)
-                logger.info(f"[{extraction_id}] Video fuente eliminado tras extracción exitosa: {video_path}")
-        except OSError as e:
-            logger.warning(f"[{extraction_id}] No se pudo eliminar el video fuente ({video_path}): {e}")
-
-        # Encadena automáticamente una evaluación con el curso por defecto,
-        # para mantener la experiencia de "subir → ver informe completo" del
-        # piloto. Queda igual de válido evaluar de nuevo después contra otro
-        # curso via POST /extracciones/{id}/evaluaciones, sin repetir esto.
-        evaluacion = Evaluation(
-            id=str(uuid_lib.uuid4()),
-            extraction_id=extraction_id,
-            curso_id=CURSO_POR_DEFECTO,
-            status="pending",
-        )
-        db.add(evaluacion)
-        db.commit()
-        db.refresh(evaluacion)
-
-        _run_evaluation(evaluacion.id, resultado, CURSO_POR_DEFECTO)
-
-    except Exception as e:
-        logger.exception(f"[{extraction_id}] Error en extracción")
-        extraccion = db.query(Extraction).filter_by(id=extraction_id).first()
-        extraccion.status = "failed"
-        extraccion.error  = str(e)
-        db.commit()
-
-    finally:
-        db.close()
-
-
-async def _run_extraction_queued(extraction_id: str, video_path: str):
-    """Espera un cupo libre del semáforo antes de correr la extracción
-    (bloqueante) en un hilo aparte, sin bloquear el event loop."""
-    async with analysis_semaphore:
-        await asyncio.to_thread(_run_extraction, extraction_id, video_path)
-
-
-async def _run_evaluation_queued(evaluation_id: str, extraction_result: dict, curso_id: str):
-    """La evaluación no pasa por el semáforo de CPU — es solo un par de
-    llamadas al LLM, no compite por los mismos recursos que Whisper/YOLO."""
-    await asyncio.to_thread(_run_evaluation, evaluation_id, extraction_result, curso_id)
-
-
 def compute_file_hash(file_path: str) -> str:
     """UUID5 basado en hash SHA256 del contenido del archivo."""
     sha = hashlib.sha256()
@@ -270,15 +102,9 @@ def _ultima_evaluacion(db: Session, extraction_id: str):
 
 
 def _estado_combinado(extraccion, evaluacion) -> str:
-    """El estado que ve el frontend: mientras la extracción no termine, es el
-    de la extracción. Una vez lista, hay que esperar a que la evaluación
-    encadenada automáticamente también llegue a un estado final (done o
-    failed) — si se reportara 'done' apenas termina la extracción, el
-    frontend podría consultar justo en el hueco antes de que la evaluación
-    exista o termine, y ver un informe vacío. Si la evaluación falla, se
-    sigue reportando 'done' igual: la extracción es la parte valiosa/costosa,
-    y evaluacion.py ya tiene sus propios respaldos defensivos para no dejar
-    campos vacíos ante un fallo del LLM."""
+    """Estado visible: extracción primero, luego espera a que la evaluación
+    encadenada también termine (evita un hueco donde el frontend vería un
+    informe vacío). Si la evaluación falla, igual se reporta 'done'."""
     if extraccion.status != "done":
         return extraccion.status
     if evaluacion is None or evaluacion.status in ("pending", "running"):
@@ -308,6 +134,7 @@ def serve_index():
 def analyze_from_file(
     filename: str,
     background_tasks: BackgroundTasks,
+    curso_id: str = CURSO_POR_DEFECTO,
     db: Session = Depends(get_db),
 ):
     """v1 — video ya está en la carpeta video/"""
@@ -317,7 +144,7 @@ def analyze_from_file(
 
     extraccion = _create_extraction(filename, path, db)
     logger.info(f"[{extraccion.id}] Extracción creada (from-file)")
-    background_tasks.add_task(_run_extraction_queued, extraccion.id, path)
+    background_tasks.add_task(jobs.run_extraction_queued, extraccion.id, path, curso_id)
     return {"job_id": extraccion.id, "status": "pending"}
 
 
@@ -330,9 +157,13 @@ def analyze_from_upload(
     tipo:            str = Form(""),
     dependencia:     str = Form(""),
     analista_id:     str = Form(""),
+    curso_id:        str = Form(CURSO_POR_DEFECTO),
     db: Session = Depends(get_db),
 ):
-    dest = os.path.join(VIDEO_FOLDER, file.filename)
+    # Prefijo único: dos docentes pueden subir archivos con el mismo nombre
+    # (ej. "VIDEO.mp4"); sin esto, el segundo pisa al primero en disco.
+    nombre_unico = f"{uuid_lib.uuid4().hex[:12]}_{file.filename}"
+    dest = os.path.join(VIDEO_FOLDER, nombre_unico)
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
@@ -367,8 +198,8 @@ def analyze_from_upload(
         analista_id     = analista_id or None,
         file_hash       = file_hash,
     )
-    logger.info(f"[{extraccion.id}] Extracción creada — nombre='{nombre_analisis}' presentador='{presentador}' analista='{analista_id}' hash={file_hash[:12]}...")
-    background_tasks.add_task(_run_extraction_queued, extraccion.id, dest)
+    logger.info(f"[{extraccion.id}] Extracción creada — nombre='{nombre_analisis}' presentador='{presentador}' analista='{analista_id}' curso='{curso_id}' hash={file_hash[:12]}...")
+    background_tasks.add_task(jobs.run_extraction_queued, extraccion.id, dest, curso_id)
     return {
         "duplicate": False,
         "job_id":    extraccion.id,
@@ -402,7 +233,7 @@ def crear_evaluacion(
     db.commit()
     db.refresh(evaluacion)
 
-    background_tasks.add_task(_run_evaluation_queued, evaluacion.id, extraccion.result, evaluacion.curso_id)
+    background_tasks.add_task(jobs.run_evaluation_queued, evaluacion.id, extraccion.result, evaluacion.curso_id)
     return {"evaluation_id": evaluacion.id, "extraction_id": extraction_id, "curso_id": evaluacion.curso_id, "status": "pending"}
 
 
@@ -448,6 +279,20 @@ def get_status(job_id: str, db: Session = Depends(get_db)):
     }
 
 
+def _ocultar_calificacion(resultado: dict | None) -> dict | None:
+    """Quita el puntaje/niveles de la respuesta pública (es retroalimentación,
+    no una calificación al docente). Sigue calculándose igual por dentro;
+    queda completo en /extracciones/{id} y /evaluaciones/{id}."""
+    if not resultado:
+        return resultado
+    evaluacion = resultado.get("evaluacion")
+    if isinstance(evaluacion, dict):
+        evaluacion = {k: v for k, v in evaluacion.items()
+                      if k not in ("score_final", "score_rubrica", "score_oratoria", "criterios")}
+        resultado = {**resultado, "evaluacion": evaluacion}
+    return resultado
+
+
 @app.get("/analyze/{job_id}")
 def get_result_raw(job_id: str, db: Session = Depends(get_db)):
     extraccion = db.query(Extraction).filter_by(id=job_id).first()
@@ -462,7 +307,7 @@ def get_result_raw(job_id: str, db: Session = Depends(get_db)):
         "job_id":   extraccion.id,
         "filename": extraccion.filename,
         "status":   _estado_combinado(extraccion, evaluacion),
-        "result":   resultado,
+        "result":   _ocultar_calificacion(resultado),
         "error":    extraccion.error or (evaluacion.error if evaluacion else None),
     }
 
@@ -476,11 +321,9 @@ def list_jobs(analista_id: str = "", db: Session = Depends(get_db)):
     extracciones = query.order_by(Extraction.created_at.desc()).all()
 
     filas = []
+    # Sin score_final: ver _ocultar_calificacion.
     for ext in extracciones:
         evaluacion = _ultima_evaluacion(db, ext.id)
-        score = None
-        if evaluacion and evaluacion.result:
-            score = evaluacion.result.get("evaluacion", {}).get("score_final")
         filas.append({
             "job_id":          ext.id,
             "filename":        ext.filename,
@@ -491,7 +334,6 @@ def list_jobs(analista_id: str = "", db: Session = Depends(get_db)):
             "analista_id":     ext.analista_id,
             "status":          _estado_combinado(ext, evaluacion),
             "created_at":      ext.created_at.isoformat() if ext.created_at else None,
-            "score":           score,
         })
     return filas
 
@@ -530,16 +372,14 @@ def get_result_clean(job_id: str, db: Session = Depends(get_db)):
     def get_nivel(kpi):
         return interpretaciones.get(kpi, {}).get("nivel", "desconocido")
 
+    # Sin score/niveles acá tampoco: ver _ocultar_calificacion.
     return {
         "job_id": extraccion.id,
         "status": estado,
 
         "summary": {
-            "score_final":    evaluacion.get("score_final", 0),
-            "score_rubrica":  evaluacion.get("score_rubrica"),
-            "score_oratoria": evaluacion.get("score_oratoria"),
-            "duracion_min":   round(result.get("duration_seconds", 0) / 60, 2),
-            "palabras":       result.get("total_words", 0),
+            "duracion_min": round(result.get("duration_seconds", 0) / 60, 2),
+            "palabras":     result.get("total_words", 0),
         },
 
         "video_info": result.get("video_info", {}),
@@ -547,8 +387,6 @@ def get_result_clean(job_id: str, db: Session = Depends(get_db)):
         "transcription_calidad": result.get("transcription_calidad", {}),
 
         "resumen_ejecutivo": evaluacion.get("resumen_ejecutivo", "No se pudo generar la evaluación"),
-
-        "criterios_rubrica": evaluacion.get("criterios", {}),
 
         "competencias_mbdd": result.get("competencias_mbdd", {}).get("competencias", {}),
 

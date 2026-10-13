@@ -9,19 +9,21 @@ FFMPEG_PATH   = os.getenv("FFMPEG_PATH", "ffmpeg")
 print("Usando FFMPEG:", FFMPEG_PATH)
 CHUNK_SECONDS = int(os.getenv("CHUNK_SECONDS", 600))
 
-from services.transcription.analyzer import (
+from services.extractions.transcription.analyzer import (
     transcribe_audio, parse_words, parse_segment_quality, evaluar_calidad_transcripcion, get_duration,
 )
-from services.speech_time.analyzer   import analyze_speech_time
-from services.rhythm.analyzer        import analyze_rhythm
-from services.rhythm.audio_analyzer  import analyze_audio
-from services.sentiment.analyzer     import analyze_sentiment
-from services.clarity.analyzer       import analyze_clarity
-from services.video.analyzer import analyze_posture, analyze_objects, get_video_info
-from services.evaluacion.analyzer    import evaluar_docente
-from services.feedback.analyzer      import construir_interpretaciones
-from services.competencias_mbdd.analyzer import detectar_competencias
-from services.cursos.registro        import obtener_curso, CURSO_POR_DEFECTO
+from services.extractions.speech_time.analyzer   import analyze_speech_time
+from services.extractions.rhythm.analyzer        import analyze_rhythm
+from services.extractions.rhythm.audio_analyzer  import analyze_audio
+from services.extractions.sentiment.analyzer     import analyze_sentiment
+from services.extractions.clarity.analyzer       import analyze_clarity
+from services.extractions.posture.analyzer    import analyze_posture
+from services.extractions.objects.analyzer    import analyze_objects
+from services.extractions.video_info.analyzer import get_video_info
+from services.evaluations.evaluacion.analyzer    import evaluar_docente
+from services.transversal.feedback.analyzer      import construir_interpretaciones
+from services.evaluations.competencias_mbdd.analyzer import detectar_competencias
+from services.transversal.cursos.registro        import obtener_curso, CURSO_POR_DEFECTO
 
 TEMP_FOLDER = os.getenv("TEMP_FOLDER", "./temp")
 os.makedirs(TEMP_FOLDER, exist_ok=True)
@@ -45,7 +47,6 @@ def _serialize(obj):
 
 # ══════════════════════════════════════════════════════════════════
 # EXTRACCIÓN — la parte cara (Whisper, KPIs, postura, objetos).
-# No depende de ningún curso/rúbrica, se corre una sola vez por video.
 # ══════════════════════════════════════════════════════════════════
 
 class Extractor:
@@ -78,9 +79,7 @@ class Extractor:
         output_wav = os.path.join(TEMP_FOLDER, f"audio_{uuid.uuid4().hex[:8]}.wav")
         subprocess.run([
             FFMPEG_PATH, "-y", "-i", self.video_path,
-            # Normaliza el volumen (muchos videos de aula tienen el micrófono
-            # lejos del docente) — mejora tanto la transcripción como el
-            # análisis de pitch/energía, que usan este mismo wav.
+            # Normaliza el volumen (muchos videos de aula tienen el micrófono lejos del docente)
             "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
             "-ac", "1", "-ar", "16000", "-vn", output_wav
         ],
@@ -219,8 +218,6 @@ class Extractor:
 
 # ══════════════════════════════════════════════════════════════════
 # EVALUACIÓN — la parte barata (rúbrica + competencias MBDD, vía LLM).
-# Toma una extracción YA HECHA + un curso, y se puede repetir las veces
-# que haga falta sin volver a pagar el costo de la extracción.
 # ══════════════════════════════════════════════════════════════════
 
 def evaluar_extraccion(extraccion: dict, curso_id: str = CURSO_POR_DEFECTO) -> dict:
