@@ -81,6 +81,36 @@ def parse_words(segments: list) -> list[dict]:
     return words
 
 
+def build_transcript_segments(words: list[dict], duration_seconds: float,
+                              interval_seconds: int = 15) -> list[dict]:
+    """Agrupa palabras ya transcritas en bloques temporales fijos.
+
+    Usa los timestamps por palabra de Whisper y omite los bloques que solo
+    contienen silencio, sin volver a ejecutar la transcripción.
+    """
+    if interval_seconds <= 0:
+        raise ValueError("interval_seconds debe ser mayor que cero")
+
+    buckets: dict[int, list[str]] = {}
+    for word in words:
+        start = float(word.get("start", 0))
+        bucket = int(start // interval_seconds)
+        text = str(word.get("word", "")).strip()
+        if text:
+            buckets.setdefault(bucket, []).append(text)
+
+    segments = []
+    for bucket, text in sorted(buckets.items()):
+        start = bucket * interval_seconds
+        end = min(start + interval_seconds, duration_seconds) if duration_seconds else start + interval_seconds
+        segments.append({
+            "start_seconds": round(start, 3),
+            "end_seconds": round(end, 3),
+            "text": " ".join(text),
+        })
+    return segments
+
+
 def parse_segment_quality(segments: list) -> list[dict]:
     """
     Señales de confianza por segmento que Whisper ya calcula internamente

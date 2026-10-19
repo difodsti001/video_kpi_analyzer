@@ -280,15 +280,22 @@ def get_status(job_id: str, db: Session = Depends(get_db)):
 
 
 def _ocultar_calificacion(resultado: dict | None) -> dict | None:
-    """Quita el puntaje/niveles de la respuesta pública (es retroalimentación,
-    no una calificación al docente). Sigue calculándose igual por dentro;
-    queda completo en /extracciones/{id} y /evaluaciones/{id}."""
+    """Oculta puntajes de la respuesta pública, conservando solo el nivel de
+    cada criterio como retroalimentación cualitativa."""
     if not resultado:
         return resultado
     evaluacion = resultado.get("evaluacion")
     if isinstance(evaluacion, dict):
+        criterios_visibles = {}
+        for criterio_id, criterio in evaluacion.get("criterios", {}).items():
+            if isinstance(criterio, dict):
+                criterios_visibles[criterio_id] = {
+                    "nombre": criterio.get("nombre", criterio_id),
+                    "nivel": criterio.get("nivel", "no evaluado"),
+                }
         evaluacion = {k: v for k, v in evaluacion.items()
                       if k not in ("score_final", "score_rubrica", "score_oratoria", "criterios")}
+        evaluacion["criterios"] = criterios_visibles
         resultado = {**resultado, "evaluacion": evaluacion}
     return resultado
 

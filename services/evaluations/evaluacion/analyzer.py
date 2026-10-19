@@ -15,6 +15,12 @@ from services.transversal.feedback.analyzer import construir_interpretaciones, c
 # I-ED-L-D → 1-4. Esto sí es fijo: es la escala de niveles del proyecto, no
 # algo que varíe por curso (lo que varía es QUÉ describe cada nivel).
 NIVEL_VALOR = {"inicio": 1, "en desarrollo": 2, "logrado": 3, "destacado": 4}
+ORDEN_NIVELES = ("Inicio", "En desarrollo", "Logrado", "Destacado")
+
+
+def _usa_puntaje_directo(criterio: dict) -> bool:
+    """Una rúbrica puede definir puntos por criterio (en vez de pesos 0-1)."""
+    return "max_puntos" in criterio
 
 
 # ── 1. EVIDENCIA ──────────────────────────────────────────────────
@@ -37,13 +43,20 @@ def construir_evidencia(transcript: str, interpretaciones: dict, objetos: dict) 
 
 def _bloque_criterio(c: dict) -> str:
     niveles = c["niveles"]
+    escala = (
+        f"({c['max_puntos']} puntos máximos)"
+        if _usa_puntaje_directo(c)
+        else f"(peso {c['peso']:.0%})"
+    )
+    niveles_txt = "\n".join(
+        f"- {nombre}: {niveles[nombre]}"
+        for nombre in ORDEN_NIVELES
+        if nombre in niveles
+    )
     return (
-        f"### {c['id']} — {c['nombre']} (peso {c['peso']:.0%})\n"
+        f"### {c['id']} — {c['nombre']} {escala}\n"
         f"Qué evalúa: {c['que_evalua']}\n"
-        f"- Inicio: {niveles['Inicio']}\n"
-        f"- En desarrollo: {niveles['En desarrollo']}\n"
-        f"- Logrado: {niveles['Logrado']}\n"
-        f"- Destacado: {niveles['Destacado']}"
+        f"{niveles_txt}"
     )
 
 
@@ -53,17 +66,29 @@ def construir_prompt_evaluacion(evidencia: dict, score_oratoria: float, criterio
     objetos_txt   = "; ".join(evidencia["objetos_detectados"]) or "no se detectaron objetos relevantes"
 
     ids_json = ",\n  ".join(
-        f'"{c["id"]}": {{"nivel": "Inicio|En desarrollo|Logrado|Destacado", "justificacion": "..."}}'
+        (
+            f'"{c["id"]}": {{"nivel": "Inicio|En desarrollo|Logrado|Destacado", '
+            f'"puntaje": 0, "justificacion": "..."}}'
+            if _usa_puntaje_directo(c) else
+            f'"{c["id"]}": {{"nivel": "Inicio|En desarrollo|Logrado|Destacado", "justificacion": "..."}}'
+        )
         for c in criterios_rubrica
     )
+
+    instruccion_puntaje = ""
+    if any(_usa_puntaje_directo(c) for c in criterios_rubrica):
+        instruccion_puntaje = (
+            " Para cada criterio que indique puntos máximos, incluye también `puntaje` "
+            "como un número entero dentro del rango descrito por el nivel elegido."
+        )
 
     return f"""Eres un evaluador pedagógico. Tu tarea es evaluar a un docente en acción a partir de la \
 grabación de su clase, considerando tanto el CONTENIDO de lo que enseña (rúbrica) como la FORMA en que \
 lo comunica (oratoria) y los recursos que usa en el video.
 
 PASO 1 — Evalúa cada criterio de la rúbrica usando ÚNICAMENTE la evidencia de la transcripción, \
-eligiendo el nivel que mejor describe el desempeño: Inicio, En desarrollo, Logrado o Destacado, y \
-justificando con datos concretos.
+eligiendo el nivel que mejor describe el desempeño según los niveles definidos en cada criterio, y \
+justificando con datos concretos.{instruccion_puntaje}
 
 {criterios_txt}
 
@@ -120,12 +145,28 @@ def parsear_respuesta(raw: str | None, criterios_rubrica: list[dict]) -> tuple[d
     for c in criterios_rubrica:
         entry = criterios_raw.get(c["id"], {}) if isinstance(criterios_raw, dict) else {}
         nivel = entry.get("nivel", "no evaluado") if isinstance(entry, dict) else "no evaluado"
+        puntaje = entry.get("puntaje") if isinstance(entry, dict) else None
+        if _usa_puntaje_directo(c):
+            try:
+                puntaje_decimal = float(puntaje)
+                puntaje = int(puntaje_decimal)
+                if puntaje_decimal != puntaje:
+                    puntaje = None
+            except (TypeError, ValueError):
+                puntaje = None
+            if puntaje is not None and not 0 <= puntaje <= c["max_puntos"]:
+                puntaje = None
+            rango = c.get("rangos_puntaje", {}).get(str(nivel))
+            if puntaje is not None and rango and not rango[0] <= puntaje <= rango[1]:
+                puntaje = None
         criterios[c["id"]] = {
             "nombre":        c["nombre"],
             "peso":          c["peso"],
             "nivel":         nivel,
             "justificacion": entry.get("justificacion", "") if isinstance(entry, dict) else "",
             "valor":         NIVEL_VALOR.get(str(nivel).strip().lower()),
+            "puntaje":       puntaje,
+            "max_puntos":    c.get("max_puntos"),
         }
 
     resumen_ejecutivo = data.get("resumen_ejecutivo") if isinstance(data, dict) else None
@@ -138,6 +179,15 @@ def parsear_respuesta(raw: str | None, criterios_rubrica: list[dict]) -> tuple[d
 # ── 4. SCORES ─────────────────────────────────────────────────────
 
 def calcular_score_rubrica(criterios: dict) -> float | None:
+    criterios_con_puntos = [c for c in criterios.values() if c.get("max_puntos") is not None]
+    if criterios_con_puntos:
+        if len(criterios_con_puntos) != len(criterios) or any(c.get("puntaje") is None for c in criterios_con_puntos):
+            return None
+        maximo = sum(c["max_puntos"] for c in criterios_con_puntos)
+        if maximo == 0:
+            return None
+        return round(sum(c["puntaje"] for c in criterios_con_puntos) / maximo * 20, 2)
+
     total_peso  = 0.0
     total_valor = 0.0
     for c in criterios.values():

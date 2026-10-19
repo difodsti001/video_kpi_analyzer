@@ -8,9 +8,11 @@ load_dotenv()
 FFMPEG_PATH   = os.getenv("FFMPEG_PATH", "ffmpeg")
 print("Usando FFMPEG:", FFMPEG_PATH)
 CHUNK_SECONDS = int(os.getenv("CHUNK_SECONDS", 600))
+TRANSCRIPT_INTERVAL_SECONDS = max(1, int(os.getenv("TRANSCRIPT_INTERVAL_SECONDS", 15)))
 
 from services.extractions.transcription.analyzer import (
     transcribe_audio, parse_words, parse_segment_quality, evaluar_calidad_transcripcion, get_duration,
+    build_transcript_segments,
 )
 from services.extractions.speech_time.analyzer   import analyze_speech_time
 from services.extractions.rhythm.analyzer        import analyze_rhythm
@@ -200,6 +202,9 @@ class Extractor:
             "duration_seconds": self.duration,
             "total_words":      len(self.all_words),
             "transcript":       self.transcript,
+            "transcript_segments": build_transcript_segments(
+                self.all_words, self.duration, TRANSCRIPT_INTERVAL_SECONDS
+            ),
             "transcription_quality": self.transcription_quality,
             "transcription_calidad": self.transcription_calidad,
             "video_info":       self.video_info,

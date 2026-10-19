@@ -941,11 +941,9 @@ function renderResultado(result, container) {
   const struct   = clar.structure || {};
   const tags   = buildTags(interp);
   const resumenEjecutivo = ev.resumen_ejecutivo || '—';
+  const criteriosRubrica = ev.criterios || {};
 
-  // Nota: no se muestra puntaje ni nivel (Inicio/En desarrollo/Logrado/
-  // Destacado) — esto no es una calificación hacia el docente, es una ruta
-  // de retroalimentación. La rúbrica sigue calculándose igual que antes
-  // para análisis pedagógico interno; solo se deja de exponer acá.
+  // Se muestran únicamente los niveles cualitativos, sin puntajes.
   const heroHtml = `
   <div class="score-hero">
     <div style="flex:1">
@@ -956,6 +954,11 @@ function renderResultado(result, container) {
   <div class="section-label">Retroalimentación</div>
   <div class="card">
     <div class="feedback-box">${resumenEjecutivo.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>')}</div>
+  </div>
+
+  <div class="section-label">Niveles de la rúbrica</div>
+  <div class="card" style="padding:14px 18px;margin-bottom:16px">
+    ${buildRubricaSection(criteriosRubrica)}
   </div>`;
 
   const detailHtml = `
@@ -1154,11 +1157,10 @@ function buildRubricaSection(criterios) {
 
   return entries.map(([id, c]) => `
     <div style="padding:10px 0;border-bottom:1px solid var(--borde)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <span style="font-size:13px;font-weight:500;color:var(--texto)">${id} · ${c.nombre} <span style="color:var(--texto-3);font-weight:400">(peso ${(c.peso*100).toFixed(0)}%)</span></span>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;font-weight:500;color:var(--texto)">${id} · ${c.nombre}</span>
         <span class="badge" style="background:${NIVEL_COLOR[c.nivel]||'#94A3B8'}22;color:${NIVEL_COLOR[c.nivel]||'#57534E'}">${c.nivel}</span>
       </div>
-      <div style="font-size:12px;color:var(--texto-2)">${c.justificacion || '—'}</div>
     </div>
   `).join('');
 }
@@ -1519,7 +1521,10 @@ async function loadHistorial() {
 // TRANSCRIPCION / EXPORTAR
 // ══════════════════════════════════════════════════════
 function verTranscripcion() {
-  const transcript = state.currentResult?.transcript || '';
+  const segments = state.currentResult?.transcript_segments || [];
+  const transcript = segments.length
+    ? segments.map(s => `[${fmtTranscriptTime(s.start_seconds)}–${fmtTranscriptTime(s.end_seconds)}] ${s.text}`).join('\n\n')
+    : (state.currentResult?.transcript || '');
   if (!transcript) { showToast('No hay transcripción disponible'); return; }
   const modal = document.getElementById('modal-transcript');
   document.getElementById('modal-text').textContent = transcript;
@@ -1682,6 +1687,12 @@ function pct(v)          { return v != null ? (v*100).toFixed(0)+'%' : '—'; }
 function fmtTime(secs)   {
   const m = Math.floor(secs/60), s = secs%60;
   return `${m}:${s.toString().padStart(2,'0')}`;
+}
+function fmtTranscriptTime(secs) {
+  const total = Math.max(0, Math.floor(Number(secs) || 0));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
 }
 function formatBytes(bytes) {
   if (bytes < 1024*1024) return (bytes/1024).toFixed(0)+' KB';

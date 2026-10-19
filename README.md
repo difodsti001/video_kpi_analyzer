@@ -162,6 +162,7 @@ TEMP_FOLDER=./temp
 FFMPEG_PATH=ffmpeg
 FFPROBE_PATH=ffprobe
 CHUNK_SECONDS=600
+TRANSCRIPT_INTERVAL_SECONDS=15
 WHISPER_MODEL=small
 
 # Autenticación de los endpoints de análisis (header X-API-Key)
@@ -200,6 +201,7 @@ AZURE_OPENAI_DEPLOYMENT=
 - `VIDEO_FOLDER` / `TEMP_FOLDER`: carpetas de videos de entrada y archivos temporales del pipeline.
 - `FFMPEG_PATH` / `FFPROBE_PATH`: ruta a los ejecutables de ffmpeg/ffprobe.
 - `CHUNK_SECONDS`: duración de cada fragmento de audio para transcripción.
+- `TRANSCRIPT_INTERVAL_SECONDS`: duración, en segundos, de cada bloque con marca temporal mostrado en la transcripción.
 - `WHISPER_MODEL`: tamaño del modelo de transcripción (`tiny`, `base`, `small`, `medium`, `large`).
 - `API_KEY`: clave compartida requerida en el header `X-API-Key` para `/analyze/upload` y `/analyze/from-file`. Si no está configurada, esos endpoints rechazan toda petición (falla cerrado).
 - `MAX_CONCURRENT_ANALYSIS`: cuántas extracciones pesadas (Whisper+YOLO+MediaPipe) pueden correr al mismo tiempo; el resto espera en cola.
