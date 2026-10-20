@@ -1,0 +1,14 @@
+[
+    {
+        "path": "/analyze/from-file",
+        "method": "POST",
+        "params": {"filename": "VIDEO-SESIÓN 1.mp4"},
+        "json": null
+    },
+    {
+        "path": "/analyze/from-file",
+        "method": "POST",
+        "params": {"filename": "VIDEO-SESIÓN 1.mp4"},
+        "json": null
+    }
+]
