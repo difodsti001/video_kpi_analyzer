@@ -1,5 +1,10 @@
 import os
+import subprocess
 import cv2
+from dotenv import load_dotenv
+
+load_dotenv()
+FFPROBE_PATH = os.getenv("FFPROBE_PATH", "ffprobe")
 
 #------------------------------------------------------------
 # Ficha técnica del archivo de video
@@ -17,6 +22,20 @@ def _calidad_label(height: int) -> str:
     return "Baja resolución"
 
 
+def _duration_with_ffprobe(video_path: str) -> float | None:
+    """Obtiene la duración real del contenedor, incluso en videos con FPS variable."""
+    try:
+        result = subprocess.run(
+            [FFPROBE_PATH, "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+            capture_output=True, text=True, check=True,
+        )
+        duration = float(result.stdout.strip())
+        return round(duration, 2) if duration > 0 else None
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        return None
+
+
 def get_video_info(video_path: str) -> dict:
     """Metadata básica del archivo: duración, resolución/calidad, fps y peso."""
     size_bytes = os.path.getsize(video_path) if os.path.exists(video_path) else 0
@@ -32,7 +51,11 @@ def get_video_info(video_path: str) -> dict:
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps    = cap.get(cv2.CAP_PROP_FPS) or 0.0
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    duracion_segundos = round(total_frames / fps, 2) if fps else 0.0
+    # OpenCV puede reportar conteos incorrectos en MP4 con FPS variable.
+    # ffprobe lee la duración declarada por el contenedor y es la fuente primaria.
+    duracion_segundos = _duration_with_ffprobe(video_path)
+    if duracion_segundos is None:
+        duracion_segundos = round(total_frames / fps, 2) if fps else 0.0
     cap.release()
 
     return {

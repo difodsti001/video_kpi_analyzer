@@ -138,16 +138,34 @@ def analyze_posture(video_path: str, frames_folder: str) -> dict:
     frames_muestreados = len(frames)
     results = []
 
-    with mp_pose.Pose(
-        static_image_mode=True,
-        model_complexity=1,
-        min_detection_confidence=0.5
-    ) as pose:
-        for i, frame_path in enumerate(frames):
-            data = analyze_frame(pose, frame_path)
-            if data:
-                data["second"] = i
-                results.append(data)
+    try:
+        with mp_pose.Pose(
+            static_image_mode=True,
+            model_complexity=1,
+            min_detection_confidence=0.5
+        ) as pose:
+            for i, frame_path in enumerate(frames):
+                data = analyze_frame(pose, frame_path)
+                if data:
+                    data["second"] = i
+                    results.append(data)
+    except Exception as exc:
+        # Pose es evidencia complementaria: una incompatibilidad del modelo no
+        # debe impedir transcribir, detectar recursos ni generar la ficha.
+        for frame in frames:
+            try:
+                os.remove(frame)
+            except OSError:
+                pass
+        try:
+            os.rmdir(frames_folder)
+        except OSError:
+            pass
+        return {
+            "error": f"No fue posible inicializar MediaPipe Pose: {exc}",
+            "frames_muestreados": frames_muestreados,
+            "frames_con_persona": 0,
+        }
 
     # limpiar frames temporales
     for f in frames:
@@ -219,6 +237,18 @@ def analyze_posture(video_path: str, frames_folder: str) -> dict:
         for r in results[::5]
     ]
 
+    # Señales por segundo para la ficha de evidencias. No identifica a la
+    # persona como docente: conserva únicamente la trayectoria normalizada de
+    # la pose principal que MediaPipe encontró en cada muestra.
+    tracking_timeline = [
+        {
+            "second": r["second"],
+            "nose_x": r["nose_x"],
+            "nose_y": r["nose_y"],
+        }
+        for r in results
+    ]
+
     return {
         # frames_analizados se mantiene por compatibilidad con el frontend
         # (index.html lo usa tal cual); significa lo mismo que
@@ -245,4 +275,5 @@ def analyze_posture(video_path: str, frames_folder: str) -> dict:
             "gesto_predominante":    gesto_predominante,
         },
         "timeline": timeline,
+        "tracking_timeline": tracking_timeline,
     }

@@ -22,9 +22,11 @@ from services.extractions.clarity.analyzer       import analyze_clarity
 from services.extractions.posture.analyzer    import analyze_posture
 from services.extractions.objects.analyzer    import analyze_objects
 from services.extractions.video_info.analyzer import get_video_info
-from services.evaluations.evaluacion.analyzer    import evaluar_docente
+from services.extractions.evidence_fusion.analyzer import build_evidence_ficha
+from services.extractions.vision_description.analyzer import analyze_visual_descriptions
+from services.pedagogical_analysis.evaluacion.analyzer import evaluar_docente
 from services.transversal.feedback.analyzer      import construir_interpretaciones
-from services.evaluations.competencias_mbdd.analyzer import detectar_competencias
+from services.pedagogical_analysis.competencias_mbdd.analyzer import detectar_competencias
 from services.transversal.cursos.registro        import obtener_curso, CURSO_POR_DEFECTO
 
 TEMP_FOLDER = os.getenv("TEMP_FOLDER", "./temp")
@@ -74,6 +76,8 @@ class Extractor:
         self.posture = {}
         self.objects   = {}
         self.video_info = {}
+        self.ficha_evidencias = {}
+        self.vision = {}
 
     # ── audio ────────────────────────────────────────────────────
 
@@ -168,6 +172,24 @@ class Extractor:
         )
         return self.objects
 
+    def run_vision_description(self) -> dict:
+        """Describe escenas con frames en memoria; no conserva imágenes."""
+        self.vision = analyze_visual_descriptions(self.video_path, self.duration)
+        return self.vision
+
+    def run_evidence_fusion(self) -> dict:
+        """Construye la ficha persistente antes de eliminar los temporales."""
+        self.ficha_evidencias = build_evidence_ficha(
+            duration_seconds=self.duration,
+            words=self.all_words,
+            transcription_quality=self.transcription_calidad,
+            posture=self.posture,
+            objects=self.objects,
+            vision=self.vision,
+            video_info=self.video_info,
+        )
+        return self.ficha_evidencias
+
     # ── limpieza ─────────────────────────────────────────────────
 
     def cleanup(self):
@@ -192,6 +214,8 @@ class Extractor:
             self.run_audio()
             self.run_posture()
             self.run_objects()
+            self.run_vision_description()
+            self.run_evidence_fusion()
         finally:
             self.cleanup()
 
@@ -208,6 +232,9 @@ class Extractor:
             "transcription_quality": self.transcription_quality,
             "transcription_calidad": self.transcription_calidad,
             "video_info":       self.video_info,
+            "ficha_evidencias": self.ficha_evidencias,
+            "vision_description": self.vision,
+            "consumo_ia": self.vision.get("consumo_ia", []),
             "kpis": {
                 "speech_time": self.speech,
                 "rhythm":      self.rhythm,
@@ -247,15 +274,28 @@ def evaluar_extraccion(extraccion: dict, curso_id: str = CURSO_POR_DEFECTO) -> d
         criterios_rubrica = curso["criterios"],
         peso_contenido    = curso["peso_contenido"],
         peso_forma        = curso["peso_forma"],
+        ficha_evidencias  = extraccion.get("ficha_evidencias", {}),
     )
+    # Se expone como referencia de lectura de la retroalimentación; no incluye
+    # niveles ni puntajes y no constituye una valoración automática.
+    evaluacion["rubrica_referencia"] = [
+        {
+            "id": c["id"],
+            "nombre": c["nombre"],
+            "que_evalua": c["que_evalua"],
+        }
+        for c in curso["criterios"]
+    ]
 
     interpretaciones = construir_interpretaciones(speech, rhythm, sentiment, clarity, audio)
     resumen_kpis     = {k: v["resumen"] for k, v in interpretaciones.items()}
     competencias_mbdd = detectar_competencias(transcript, resumen_kpis, objects)
+    consumos_ia = evaluacion.get("consumo_ia", []) + competencias_mbdd.get("consumo_ia", [])
 
     return _serialize({
         "curso_id":    curso["id"],
         "curso_nombre": curso["nombre"],
         "evaluacion":  evaluacion,
         "competencias_mbdd": competencias_mbdd,
+        "consumo_ia": consumos_ia,
     })

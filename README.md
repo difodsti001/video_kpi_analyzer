@@ -1,159 +1,74 @@
 # Video KPI Analyzer
 
-Video KPI Analyzer es un servicio para evaluar videos de clases (pensado para un piloto con MINEDU) en los que un docente enseña frente a una audiencia. El sistema transforma un video de entrada en un informe estructurado con la transcripción, métricas cuantitativas del discurso, indicadores de calidad de audio, señales de comunicación no verbal, objetos/recursos detectados, y una evaluación pedagógica basada en una rúbrica de contenido y en las competencias del Marco del Buen Desempeño Docente (MBDD).
+Video KPI Analyzer convierte un video temporal de aula en una **ficha de evidencias pedagógicas**. Combina transcripción, señales de audio y video, descripciones visuales con tiempo y orientación pedagógica guiada por una rúbrica configurable.
 
-La aplicación está construida alrededor de una API FastAPI y un frontend estático incluido en el repositorio (`index.html`). Cada video sube por la API y se procesa en dos etapas independientes:
-
-1. **Extracción** — la parte cara del pipeline (Whisper, KPIs de oratoria, postura, objetos). Se corre una sola vez por video, sin depender de ningún curso o rúbrica.
-2. **Evaluación** — la parte barata (una llamada al LLM) que juzga la extracción ya hecha contra la rúbrica de un curso específico y detecta evidencia de las competencias MBDD. Puede repetirse contra otro curso sin volver a pagar el costo de la extracción.
-
-Esto permite, por ejemplo, re-evaluar el mismo video con una rúbrica distinta en segundos, en vez de volver a correr Whisper/YOLO/MediaPipe.
-
-## Objetivo y alcance
-
-El proyecto sirve como base para convertir observaciones subjetivas sobre una clase en señales medibles y comparables. No pretende sustituir la evaluación humana: sus resultados son indicadores automáticos que deben interpretarse junto con el contexto, el contenido de la clase y los objetivos de cada curso.
-
-El resultado de un análisis incluye:
-
-- La duración del video y el total de palabras detectadas
-- La transcripción completa del discurso, con señales de confianza de Whisper (`avg_logprob`, `no_speech_prob`, `compression_ratio`) y un veredicto de calidad agregado
-- KPIs separados de tiempo de habla, ritmo, sentimiento, claridad y audio
-- Indicadores de postura y gestos (MediaPipe) y objetos/recursos detectados en el video (YOLO)
-- Una evaluación de contenido pedagógico (rúbrica configurable por curso) con `score_final`, `score_rubrica`, `score_oratoria` y un resumen ejecutivo
-- Evidencia de las 9 competencias del MBDD, con nivel (sí / evidencia parcial / sin evidencia) y fuerza de la evidencia
-- El estado del job y, cuando corresponde, el mensaje de error del procesamiento
-
-## Qué incluye el proyecto
-
-El pipeline de **extracción** realiza:
-
-- Obtención de ficha técnica del video (resolución, duración, fps, peso)
-- Extracción y normalización de audio (ffmpeg, `loudnorm`)
-- División en chunks para transcripción
-- Transcripción con Whisper, capturando señales de confianza por segmento y evaluando la calidad agregada de la transcripción
-- Cálculo de KPIs de tiempo de habla, ritmo, sentimiento, claridad y calidad de audio
-- Análisis de postura y gestos con MediaPipe Pose
-- Detección de objetos/recursos educativos con YOLO (modelo COCO o un modelo propio entrenado, `.onnx`)
-
-El pipeline de **evaluación** (repetible por curso) realiza:
-
-- Evaluación de contenido pedagógico contra la rúbrica del curso (criterios, niveles y ponderación contenido/forma configurables)
-- Generación de un resumen ejecutivo vía LLM
-- Detección de evidencia de las competencias MBDD a partir de la transcripción, los KPIs y los objetos detectados
-
-Todo se persiste en base de datos (PostgreSQL vía SQLAlchemy), con deduplicación por hash de archivo para evitar reprocesar el mismo video subido por el mismo analista.
-
-## Estructura del proyecto
+No reemplaza la valoración humana. La rúbrica organiza las evidencias y la retroalimentación; una persona revisa la ficha y realiza la valoración posterior.
 
 ```text
-.
-├── main.py                    # API FastAPI: solo rutas
-├── jobs.py                    # Orquestación en segundo plano: cola, reintentos, limpieza de jobs atascados
-├── core.py                    # Extractor (pipeline pesado) y evaluar_extraccion (pipeline de evaluación)
-├── index.html                 # Frontend estático servido por la API
-├── requirements.txt           # Dependencias Python
-├── ffmpeg.exe / ffprobe.exe    # Binarios usados por el pipeline (extracción de audio/frames y duración)
-├── yolo26n.pt                 # Modelo YOLO base (COCO), usado si YOLO_MODEL no apunta a uno propio
-├── sifods_v1_best.onnx        # Modelo YOLO propio entrenado para objetos educativos específicos
-├── video/                     # Videos subidos, pendientes o en proceso de análisis
-├── temp/                      # Archivos temporales (audio, chunks, frames) — se limpian al terminar
-├── services/
-│   ├── extractions/            # Todo lo cuantitativo: se extrae del video/audio, no depende de ningún curso
-│   │   ├── transcription/      # Transcripción con Whisper + señales de calidad por segmento
-│   │   ├── speech_time/        # Tiempo de habla y proporción de habla
-│   │   ├── rhythm/              # Ritmo del habla y características acústicas
-│   │   ├── sentiment/            # Sentimiento/tono emocional del discurso
-│   │   ├── clarity/               # Claridad del discurso (muletillas, etc.)
-│   │   ├── posture/                # Postura/gestos (MediaPipe Pose)
-│   │   ├── objects/                 # Detección de objetos/recursos (YOLO, modelo COCO o propio)
-│   │   └── video_info/              # Ficha técnica del archivo (resolución, duración, peso)
-│   ├── evaluations/             # Todo lo cualitativo: juzga la extracción contra una rúbrica, vía LLM
-│   │   ├── evaluacion/           # Evaluación de contenido pedagógico + resumen ejecutivo
-│   │   └── competencias_mbdd/     # Detección de evidencia de las 9 competencias del MBDD
-│   └── transversal/             # Infraestructura y configuración que usan ambas capas, sin ser ninguna
-│       ├── llm/                   # Cliente LLM (OpenAI / Azure / Anthropic / Gemini) con reintentos
-│       ├── cursos/                 # Resuelve qué rúbrica/ponderación aplica a cada curso (lee de la BD)
-│       └── feedback/                # Interpretación por reglas (sin LLM) de los KPIs de oratoria
-├── shared/
-│   ├── database.py              # Motor, sesión y base declarativa de SQLAlchemy
-│   └── models.py                 # Extraction, Evaluation y RubricaCurso (ver sección Base de datos)
-└── test_objects.py               # Utilidad standalone para probar/depurar la detección YOLO
+Video temporal → extracción de evidencias → análisis pedagógico
+               → ficha + orientación narrativa → valoración humana externa
 ```
 
-> Nota: las herramientas de línea de comandos para subir videos en lote, probar carga/escalabilidad del servicio, etc. no son parte del servicio en sí y viven aparte, fuera de esta estructura.
+## Resultado
 
-### Descripción de las carpetas
+- Transcripción por segmentos y calidad agregada de Whisper.
+- Ficha multimodal por tiempo: audio, descripción visual, fuente y confianza.
+- Señales de discurso, postura, recursos y composición visual.
+- Orientación pedagógica por criterio, vinculada a evidencias temporales reales.
+- Evidencia relacionada con las competencias del MBDD.
+- Uso de IA por llamada: proveedor, modelo, solicitudes, imágenes y tokens; sin precios ni costos.
 
-- `video/`: videos de entrada, tanto subidos vía `/analyze/upload` como colocados manualmente para `/analyze/from-file`.
-- `temp/`: archivos intermedios del pipeline (audio extraído, chunks, frames para postura/objetos). Se eliminan al finalizar el procesamiento, con éxito o con error.
-- `services/`: organizado en 3 capas, para poder tocar una sin arriesgar las otras:
-  - **`services/extractions/`** — lo que se calcula directamente del video/audio, sin depender de ningún curso o rúbrica:
-    - `transcription/`: transcribe con Whisper, captura `avg_logprob`/`no_speech_prob`/`compression_ratio` por segmento y evalúa la confiabilidad agregada de la transcripción.
-    - `speech_time/`: tiempo hablado y su relación con la duración total del video.
-    - `rhythm/`: ritmo del habla y características acústicas.
-    - `sentiment/`: sentimiento/tono general del discurso.
-    - `clarity/`: indicadores de claridad del discurso a partir de las palabras transcritas.
-    - `posture/`: postura y gestos vía MediaPipe Pose.
-    - `objects/`: detección de objetos/recursos educativos vía YOLO.
-    - `video_info/`: ficha técnica del archivo (resolución, duración, peso).
-  - **`services/evaluations/`** — lo que juzga la extracción ya hecha contra la rúbrica de un curso, vía LLM:
-    - `evaluacion/`: evalúa el contenido pedagógico contra la rúbrica del curso (recibida como parámetro, no fija) y redacta el resumen ejecutivo, cruzando esa lectura con los KPIs de oratoria y los objetos detectados.
-    - `competencias_mbdd/`: evalúa evidencia de las 9 competencias oficiales del Marco del Buen Desempeño Docente (institución-wide, no varía por curso).
-  - **`services/transversal/`** — infraestructura y configuración que usan ambas capas de arriba, sin ser ni extracción ni evaluación en sí:
-    - `llm/`: encapsula la integración con el proveedor LLM configurado, con reintentos con backoff exponencial — infraestructura, no un evaluador en sí.
-    - `cursos/`: resuelve la configuración (rúbrica + ponderación) de un curso leyendo la tabla `rubricas_curso`; cae a `"default"` si el curso pedido no existe o está inactivo.
-    - `feedback/`: combina los KPIs de discurso y audio en interpretaciones cualitativas (nivel, fortaleza) **por reglas fijas, sin LLM** — insumo para `evaluacion/` y `competencias_mbdd/`.
-- `shared/`: componentes compartidos por la API y el pipeline:
-  - `shared/database.py`: motor, sesión (`SessionLocal`) y base declarativa de SQLAlchemy.
-  - `shared/models.py`: `Extraction` (extracciones), `Evaluation` (evaluaciones) y `RubricaCurso` (rubricas_curso) — ver [Base de datos](#base-de-datos).
+La ficha no identifica biométricamente a las personas ni atribuye automáticamente roles como docente o estudiante. La ausencia de evidencia tampoco demuestra la ausencia de un hecho.
 
-Los archivos de la raíz cumplen funciones de coordinación: `main.py` expone la API, administra la cola de extracciones concurrentes y limpia jobs atascados; `core.py` contiene la clase `Extractor` (pipeline pesado) y la función `evaluar_extraccion()` (pipeline de evaluación); `index.html` es la interfaz web; `test_objects.py` es una utilidad de diagnóstico para la detección YOLO.
+## Retención
 
-## Requisitos previos
-- Python 3.10 o superior
-- ffmpeg y ffprobe (ya incluidos en la raíz del proyecto como `ffmpeg.exe`/`ffprobe.exe`, o apuntar `FFMPEG_PATH`/`FFPROBE_PATH` a tu propia instalación)
-- PostgreSQL en ejecución o una URL de base de datos accesible
-- Dependencias instaladas desde `requirements.txt`
-- Credenciales de un proveedor LLM (Azure OpenAI, OpenAI, Anthropic o Gemini) si se quiere la evaluación de contenido pedagógico y competencias MBDD — sin esto, el pipeline de extracción funciona igual, pero la evaluación fallará
+- El video fuente se elimina después de una extracción exitosa.
+- No se conservan clips, audio temporal ni frames.
+- Los frames usados por visión se procesan solo en memoria; se persiste únicamente texto con tiempo.
 
-### Verificar FFmpeg
+## Arquitectura
 
-En Windows:
+```text
+services/
+├── extractions/
+│   ├── transcription/       # Whisper y calidad de transcripción
+│   ├── speech_time/, rhythm/, sentiment/, clarity/, audio/
+│   ├── posture/             # MediaPipe Pose
+│   ├── objects/             # YOLO / ONNX Runtime
+│   ├── vision_description/ # Descripción visual temporal con modelo multimodal
+│   ├── evidence_fusion/     # Ficha de evidencias por ventanas
+│   └── video_info/          # Datos técnicos del video
+├── pedagogical_analysis/
+│   ├── evaluacion/          # Orientación pedagógica trazable por rúbrica
+│   └── competencias_mbdd/   # Evidencia relacionada con MBDD
+└── transversal/
+    ├── cursos/              # Rúbricas configurables por curso
+    ├── feedback/            # Interpretación de KPIs por reglas
+    └── llm/                 # Proveedores LLM y captura de tokens
+```
+
+Archivos principales: `main.py` (API), `jobs.py` (trabajos y persistencia), `core.py` (pipeline), `index.html` (interfaz) y `shared/models.py` (modelos de base de datos).
+
+## Requisitos e instalación
+
+- Python 3.10 o superior.
+- PostgreSQL.
+- FFmpeg y FFprobe.
+- Dependencias de `requirements.txt`.
+- Un proveedor LLM para visión, orientación pedagógica y MBDD.
 
 ```powershell
-ffmpeg -version
-ffprobe -version
-```
-
-## Instalación
-
-1. Crear y activar un entorno virtual:
-
-```bash
-python -m venv .venv
-```
-
-Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\activate
-```
-
-Linux/macOS:
-
-```bash
-source .venv/bin/activate
-```
-
-2. Instalar dependencias:
-
-```bash
+python -m venv venv
+.\venv\Scripts\activate
 pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 9000
 ```
 
-## Variables de entorno
+La interfaz queda en `http://localhost:9000` y Swagger en `http://localhost:9000/docs`.
 
-Crea un archivo `.env` en la raíz del proyecto con algo como esto:
+## Configuración
+
+Ejemplo de `.env`:
 
 ```env
 DATABASE_URL=postgresql://postgres:password@localhost:5432/videokpi
@@ -161,166 +76,88 @@ VIDEO_FOLDER=./video
 TEMP_FOLDER=./temp
 FFMPEG_PATH=ffmpeg
 FFPROBE_PATH=ffprobe
-CHUNK_SECONDS=600
-TRANSCRIPT_INTERVAL_SECONDS=15
 WHISPER_MODEL=small
-
-# Autenticación de los endpoints de análisis (header X-API-Key)
 API_KEY=cambiar-por-una-clave-propia
 
-# Control de concurrencia y limpieza de jobs atascados
-MAX_CONCURRENT_ANALYSIS=2
-JOB_STALE_TIMEOUT_MIN=360
-JOB_CLEANUP_INTERVAL_SEC=300
+LLM_PROVIDER=azure
+AZURE_OPENAI_ENDPOINT=
+AZURE_OPENAI_API_KEY=
+AZURE_OPENAI_API_VERSION=2024-05-01-preview
+AZURE_OPENAI_DEPLOYMENT=
 
-# Umbral de calidad de transcripción (sin calibrar todavía con datos propios)
-QUALITY_PCT_THRESHOLD=25
-
-# Detección de objetos
-YOLO_MODEL=yolo26n.pt
+YOLO_MODEL=sifods_v1_best.onnx
+YOLO_FALLBACK_MODEL=sifods_v1_best.onnx
 YOLO_CONF=0.35
 YOLO_SAMPLE_FPS=1
 
-# Proveedor LLM para evaluación de contenido y competencias MBDD
-LLM_PROVIDER=none
-LLM_API_KEY=
-LLM_MAX_REINTENTOS=3
-LLM_ESPERA_INICIAL_SEG=2
-DEBUG_LLM_PROMPTS=false
-
-# Azure OpenAI (si LLM_PROVIDER=azure)
-AZURE_OPENAI_ENDPOINT=
-AZURE_OPENAI_API_KEY=
-AZURE_OPENAI_API_VERSION=2024-08-01-preview
-AZURE_OPENAI_DEPLOYMENT=
+VISION_ENABLED=true
+VISION_SAMPLE_SECONDS=30
+VISION_BATCH_SIZE=4
+VISION_MAX_FRAMES=120
+VISION_MAX_WIDTH=768
+EVIDENCE_WINDOW_SECONDS=30
 ```
 
-### Descripción de las variables
+- `VISION_SAMPLE_SECONDS`: menor intervalo produce mayor detalle y más tokens.
+- `VISION_BATCH_SIZE`: imágenes enviadas por llamada de visión.
+- `VISION_MAX_FRAMES`: límite de frames para videos largos.
+- `YOLO_FALLBACK_MODEL`: ONNX local usado si un checkpoint `.pt` no es compatible.
+- `EVIDENCE_WINDOW_SECONDS`: duración de cada ventana de la ficha.
 
-- `DATABASE_URL`: conexión a la base de datos.
-- `VIDEO_FOLDER` / `TEMP_FOLDER`: carpetas de videos de entrada y archivos temporales del pipeline.
-- `FFMPEG_PATH` / `FFPROBE_PATH`: ruta a los ejecutables de ffmpeg/ffprobe.
-- `CHUNK_SECONDS`: duración de cada fragmento de audio para transcripción.
-- `TRANSCRIPT_INTERVAL_SECONDS`: duración, en segundos, de cada bloque con marca temporal mostrado en la transcripción.
-- `WHISPER_MODEL`: tamaño del modelo de transcripción (`tiny`, `base`, `small`, `medium`, `large`).
-- `API_KEY`: clave compartida requerida en el header `X-API-Key` para `/analyze/upload` y `/analyze/from-file`. Si no está configurada, esos endpoints rechazan toda petición (falla cerrado).
-- `MAX_CONCURRENT_ANALYSIS`: cuántas extracciones pesadas (Whisper+YOLO+MediaPipe) pueden correr al mismo tiempo; el resto espera en cola.
-- `JOB_STALE_TIMEOUT_MIN` / `JOB_CLEANUP_INTERVAL_SEC`: cada cuánto se revisa y después de cuántos minutos sin actividad se marca como `failed` un job que quedó atascado en `running` (por ejemplo, si el proceso se cayó a mitad del análisis).
-- `QUALITY_PCT_THRESHOLD`: % máximo de segmentos de transcripción "problema" (según los umbrales internos de Whisper) que se tolera antes de marcar el video como poco confiable. Es un punto de partida, pendiente de calibrar con un lote de referencia evaluado a mano.
-- `YOLO_MODEL` / `YOLO_CONF` / `YOLO_SAMPLE_FPS`: modelo de detección de objetos (`.pt` = COCO genérico, `.onnx` = modelo propio), umbral de confianza y a cuántos frames por segundo se muestrea el video.
-- `LLM_PROVIDER`: proveedor activo para evaluación de contenido y competencias MBDD (`none`, `openai`, `azure`, `anthropic`, `gemini`).
-- `LLM_API_KEY` / `LLM_MAX_REINTENTOS` / `LLM_ESPERA_INICIAL_SEG` / `DEBUG_LLM_PROMPTS`: clave del proveedor, reintentos con backoff exponencial ante fallos, y si se guarda el prompt completo enviado al LLM (solo para depuración — infla el tamaño del resultado guardado).
-- `AZURE_OPENAI_*`: configuración específica si `LLM_PROVIDER=azure`.
+## Rúbricas por curso
 
-## Levantar el servicio
+Las rúbricas se almacenan en `rubricas_curso`. Cada `curso_id` puede tener criterios, descripciones y ponderaciones propias. El curso `default` usa la rúbrica MBDD configurada con 90 % pedagógico y 10 % oratoria.
 
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 9000
+```text
+curso A → rúbrica A → orientación A
+curso B → rúbrica B → orientación B
 ```
 
-La API queda disponible en:
+Cambiar de rúbrica no obliga a repetir Whisper, YOLO, MediaPipe ni visión: se reutiliza la extracción persistida.
 
-- http://localhost:9000
-- http://localhost:9000/docs (Swagger UI)
+## Flujo interno
 
-## Flujo de uso
+1. Se sube el video.
+2. Se extraen audio, transcripción, KPIs, postura, objetos, ficha técnica y descripción visual.
+3. Se genera la ficha de evidencias con marcas de tiempo.
+4. Se elimina el material temporal y el video fuente tras una extracción exitosa.
+5. Se aplica la rúbrica para producir orientación pedagógica y evidencia MBDD.
+6. Se registra el modelo y los tokens de cada llamada a IA.
 
-### 1. Subir un video para analizar
+La orientación pública se construye desde IDs de evidencia reales: el backend inserta el tiempo y fragmento seleccionado, evitando afirmaciones sin trazabilidad.
 
-```bash
-curl -X POST "http://localhost:9000/analyze/upload" \
-  -H "X-API-Key: tu_clave" \
-  -F "file=@video.mp4" \
-  -F "nombre_analisis=Clase de fracciones" \
-  -F "presentador=Juan" \
-  -F "tipo=Sesion" \
-  -F "dependencia=UGEL X" \
-  -F "analista_id=analista-1"
-```
-
-La respuesta devuelve un `job_id` (id de la extracción) y el estado pendiente. La extracción corre en segundo plano y, al terminar, dispara automáticamente una evaluación con el curso `"default"`.
-
-### 2. Consultar el estado
-
-```bash
-curl "http://localhost:9000/analyze/<job_id>/status"
-```
-
-### 3. Obtener el resultado combinado (extracción + evaluación)
-
-```bash
-curl "http://localhost:9000/analyze/<job_id>/result"
-```
-
-### 4. Re-evaluar el mismo video contra otro curso (sin repetir la extracción)
-
-```bash
-curl -X POST "http://localhost:9000/extracciones/<job_id>/evaluaciones" \
-  -H "X-API-Key: tu_clave" \
-  -F "curso_id=otro_curso"
-```
-
-## Endpoints principales
+## Endpoints
 
 | Endpoint | Método | Descripción |
 |---|---|---|
-| / | GET | Sirve el frontend estático |
-| /analyze/upload | POST | Sube un video, crea la extracción y encadena la evaluación por defecto |
-| /analyze/from-file | POST | Analiza un video ya presente en `video/` (requiere acceso al disco del servidor) |
-| /extracciones/{extraction_id}/evaluaciones | POST | Evalúa una extracción ya terminada contra un `curso_id` (re-evaluación o reintento) |
-| /extracciones/{extraction_id} | GET | Datos crudos de la extracción |
-| /evaluaciones/{evaluation_id} | GET | Datos crudos de una evaluación puntual |
-| /analyze/{job_id}/status | GET | Estado combinado (extracción + última evaluación) |
-| /analyze/{job_id} | GET | Resultado combinado en crudo |
-| /analyze/{job_id}/result | GET | Resultado combinado, resumido para el frontend |
-| /analyze | GET | Lista los jobs (filtrable por `analista_id`) |
-| /videos | GET | Lista los videos disponibles en `VIDEO_FOLDER` |
+| `/analyze/upload` | POST | Sube un video e inicia la extracción. |
+| `/analyze/from-file` | POST | Analiza un video existente en `video/`. |
+| `/analyze/{job_id}/status` | GET | Estado del trabajo. |
+| `/analyze/{job_id}` | GET | Resultado para la interfaz. |
+| `/analyze/{job_id}/result` | GET | Resultado resumido. |
+| `/analyze/{job_id}/ficha-evidencias` | GET | Ficha persistente sin medios. |
+| `/analyze/{job_id}/consumo-ia` | GET | Uso de IA por llamada, sin costos. |
+| `/extracciones/{id}/evaluaciones` | POST | Ejecuta análisis pedagógico contra otro curso. |
+| `/evaluaciones/{id}` | GET | Resultado de un análisis puntual. |
 
-`/analyze/upload`, `/analyze/from-file` y `POST /extracciones/{id}/evaluaciones` requieren el header `X-API-Key`; los endpoints de solo lectura no.
+Los endpoints de inicio y reanálisis requieren el header `X-API-Key`.
 
-## Pipeline interno actual
+## Uso de IA y tokens
 
-**Extracción** (`core.Extractor`, una sola vez por video):
+`consumo_ia` guarda una fila por llamada exitosa:
 
-1. Ficha técnica del video
-2. Extracción y normalización de audio
-3. División en chunks para transcripción
-4. Transcripción con Whisper, capturando señales de confianza por segmento
-5. Evaluación de calidad agregada de la transcripción
-6. KPIs de tiempo de habla, ritmo, sentimiento, claridad y audio
-7. Postura y gestos (MediaPipe Pose)
-8. Detección de objetos (YOLO)
+```text
+extraction_id, evaluation_id, capa_ia, proveedor, modelo,
+solicitudes, imagenes_enviadas, tokens_entrada, tokens_salida,
+tokens_totales, estado, fecha
+```
 
-**Evaluación** (`core.evaluar_extraccion`, repetible por curso sin repetir lo anterior):
+Las capas actuales son `descripcion_visual`, `analisis_pedagogico` y `competencias_mbdd`. Los datos están destinados a que otro equipo estime costos con sus propias tarifas.
 
-9. Resolución de la configuración del curso (rúbrica + ponderación) desde `rubricas_curso`
-10. Evaluación de contenido pedagógico + resumen ejecutivo vía LLM
-11. Detección de evidencia de competencias MBDD
+## Troubleshooting
 
-El resultado final combina ambas etapas: junto a los KPIs de extracción, incluye un campo `evaluacion` con `score_final`, `score_rubrica`, `score_oratoria`, `criterios` y `resumen_ejecutivo`, y un campo `competencias_mbdd` con la evidencia por competencia.
-
-## Base de datos
-
-Al iniciar la aplicación, SQLAlchemy crea automáticamente las tablas necesarias. Los modelos son:
-
-- **`Extraction`** (`extracciones`): la parte cara del análisis — Whisper, KPIs de oratoria, postura, objetos, ficha técnica. Se corre una sola vez por video. Incluye `file_hash` para deduplicar videos ya procesados por el mismo analista.
-- **`Evaluation`** (`evaluaciones`): la parte barata — rúbrica de contenido + competencias MBDD, evaluadas contra un `curso_id`. Varias evaluaciones pueden apuntar a la misma extracción (FK `extraction_id`), para re-evaluar con otro curso o reintentar sin pagar de nuevo el costo de la extracción.
-- **`RubricaCurso`** (`rubricas_curso`): configuración de evaluación por curso — criterios de contenido (con niveles y pesos) y la ponderación contenido/forma. Cada curso es una fila cargada directamente en la base (sin UI de administración todavía); el curso `"default"` debe existir siempre como fallback.
-
-## Notas importantes
-
-- El análisis puede tardar varios minutos según la duración del video y el modelo Whisper usado; con `MAX_CONCURRENT_ANALYSIS` limitado, los videos adicionales esperan en cola.
-- El primer uso de YOLO puede descargar o cargar pesos del modelo desde disco.
-- Los archivos temporales se almacenan en `temp/` y se limpian al finalizar el proceso, con éxito o con error.
-- La evaluación de contenido y competencias MBDD requiere un proveedor LLM configurado (`LLM_PROVIDER` distinto de `none`); sin esto, la extracción se completa pero la evaluación fallará.
-- Si la calidad de la transcripción cae por debajo del umbral configurado, el video se marca como poco confiable en los logs del servidor (auditoría interna), no en la interfaz visible al usuario.
-- Para producción conviene rotar `API_KEY` y restringir el acceso a la base de datos.
-
-## Troubleshooting rápido
-
-- Si falla ffmpeg/ffprobe: revisa `FFMPEG_PATH`/`FFPROBE_PATH` y que los binarios sean accesibles.
-- Si falla PostgreSQL: verifica `DATABASE_URL` y que el servidor esté corriendo.
-- Si falla la detección visual: revisa `YOLO_MODEL`, `YOLO_CONF` y `YOLO_SAMPLE_FPS`.
-- Si la evaluación falla con error de curso: confirma que exista la fila `"default"` en `rubricas_curso` (ver `services/transversal/cursos/registro.py`).
-- Si la evaluación falla o no se genera el resumen ejecutivo: revisa que `LLM_PROVIDER` y las credenciales correspondientes estén configuradas.
-- Si hay errores de dependencias: vuelve a ejecutar `pip install -r requirements.txt`.
+- MediaPipe falla: confirme la versión de `protobuf` fijada en `requirements.txt`.
+- YOLO `.pt` incompatible: use `sifods_v1_best.onnx` o configure `YOLO_FALLBACK_MODEL`.
+- Visión vacía: verifique un deployment compatible con imágenes y `VISION_ENABLED=true`.
+- Rúbrica no visible: reinicie el servidor y confirme el curso en `rubricas_curso`.
+- Sin tokens: la trazabilidad comienza con la versión que incorpora `consumo_ia`; no reconstruye llamadas históricas.

@@ -3,9 +3,9 @@
 # sesión, a partir de la transcripción y la evidencia ya disponible en el
 # pipeline. Pensado como una pieza que refuerza la retroalimentación al
 # docente: le muestra en qué competencias del marco se reconoce su práctica.
-from services.transversal.llm.client import llamar_llm, DEBUG_LLM_PROMPTS
+from services.transversal.llm.client import llamar_llm_con_uso, DEBUG_LLM_PROMPTS
 from services.transversal.llm.json_response import extraer_json
-from services.evaluations.competencias_mbdd.mbdd_data import (
+from services.pedagogical_analysis.competencias_mbdd.mbdd_data import (
     COMPETENCIAS_MBDD, DOMINIOS, NIVELES_EVIDENCIA, NIVELES_FUERZA, FUERZA_NO_APLICA,
 )
 
@@ -120,11 +120,11 @@ def parsear_respuesta(raw: str | None) -> dict:
 def detectar_competencias(transcript: str, resumen_kpis: dict, objetos: dict) -> dict:
     evidencia = construir_evidencia(transcript, resumen_kpis, objetos)
     prompt    = construir_prompt(evidencia)
-    raw       = llamar_llm(prompt, max_tokens=1800)
+    raw, uso  = llamar_llm_con_uso(prompt, max_tokens=1800)
 
     competencias = parsear_respuesta(raw)
 
-    resultado = {"competencias": competencias}
+    resultado = {"competencias": competencias, "consumo_ia": [dict(uso, capa_ia="competencias_mbdd")] if uso else []}
     if DEBUG_LLM_PROMPTS:
         resultado["prompt_usado"] = prompt
     return resultado

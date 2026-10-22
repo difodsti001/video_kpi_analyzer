@@ -14,7 +14,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 from shared.database import SessionLocal
-from shared.models    import Extraction, Evaluation
+from shared.models    import Extraction, Evaluation, AIUsage
 from core              import Extractor, evaluar_extraccion
 from services.transversal.cursos.registro import CURSO_POR_DEFECTO
 
@@ -28,6 +28,18 @@ analysis_semaphore = asyncio.Semaphore(MAX_CONCURRENT_ANALYSIS)
 # llamada HTTP en sí, que ya existe en services/transversal/llm/client.py.
 EVALUACION_MAX_REINTENTOS = int(os.getenv("EVALUACION_MAX_REINTENTOS", "3"))
 EVALUACION_ESPERA_REINTENTO_SEG = float(os.getenv("EVALUACION_ESPERA_REINTENTO_SEG", "3"))
+
+
+def _guardar_consumos_ia(db, extraction_id: str, evaluation_id: str | None, consumos: list[dict]):
+    for consumo in consumos or []:
+        db.add(AIUsage(
+            id=str(uuid_lib.uuid4()), extraction_id=extraction_id, evaluation_id=evaluation_id,
+            capa_ia=consumo.get("capa_ia", "desconocida"), proveedor=consumo.get("proveedor", "desconocido"),
+            modelo=consumo.get("modelo") or "desconocido", solicitudes=int(consumo.get("solicitudes") or 1),
+            imagenes_enviadas=int(consumo.get("imagenes_enviadas") or 0),
+            tokens_entrada=consumo.get("tokens_entrada"), tokens_salida=consumo.get("tokens_salida"),
+            tokens_totales=consumo.get("tokens_totales"), estado=consumo.get("estado", "exitoso"),
+        ))
 
 # Si el proceso muere a mitad de un job, queda en "running" para siempre.
 # Este loop marca como "failed" lo que lleva mucho tiempo sin actividad.
@@ -94,6 +106,7 @@ def _run_evaluation(evaluation_id: str, extraction_result: dict, curso_id: str):
 
         evaluacion.status = "done"
         evaluacion.result = resultado
+        _guardar_consumos_ia(db, evaluacion.extraction_id, evaluation_id, resultado.get("consumo_ia", []))
 
     except Exception as e:
         logger.exception(f"[{evaluation_id}] Error evaluando")
@@ -127,6 +140,7 @@ def _run_extraction(extraction_id: str, video_path: str, curso_id: str = CURSO_P
 
         extraccion.status = "done"
         extraccion.result = resultado
+        _guardar_consumos_ia(db, extraction_id, None, resultado.get("consumo_ia", []))
         db.commit()
         logger.info(f"[{extraction_id}] Extracción completa")
 

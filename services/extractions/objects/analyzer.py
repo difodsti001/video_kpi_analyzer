@@ -1,5 +1,6 @@
 import os
 import threading
+import pickle
 import cv2
 import numpy as np
 from collections import defaultdict
@@ -10,6 +11,9 @@ load_dotenv()
 YOLO_MODEL      = os.getenv("YOLO_MODEL", "yolo26n.pt")
 YOLO_CONF       = float(os.getenv("YOLO_CONF", "0.35"))
 YOLO_SAMPLE_FPS = float(os.getenv("YOLO_SAMPLE_FPS", "1"))
+YOLO_TRUSTED_CHECKPOINT = os.getenv("YOLO_TRUSTED_CHECKPOINT", "false").strip().lower() in ("1", "true", "yes")
+YOLO_FALLBACK_MODEL = os.getenv("YOLO_FALLBACK_MODEL", "sifods_v1_best.onnx")
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 OBJECT_CLASS_MAP: dict[int, dict] = {
     61: {"label": "Pizarra / Pantalla",    "categoria": "Recursos didácticos"},
@@ -48,6 +52,48 @@ def _es_modelo_custom() -> bool:
 _yolo_model = None
 _yolo_lock = threading.Lock()
 
+
+def _es_checkpoint_local_confiable(path: str) -> bool:
+    """Restringe la compatibilidad de PyTorch a pesos .pt del proyecto."""
+    absolute_path = os.path.abspath(path)
+    try:
+        dentro_del_proyecto = os.path.commonpath([PROJECT_ROOT, absolute_path]) == PROJECT_ROOT
+    except ValueError:
+        dentro_del_proyecto = False
+    return (
+        YOLO_TRUSTED_CHECKPOINT
+        and dentro_del_proyecto
+        and absolute_path.lower().endswith(".pt")
+        and os.path.isfile(absolute_path)
+    )
+
+
+def _cargar_yolo_compatible(YOLO, model_path: str):
+    """Carga pesos YOLO anteriores a Torch 2.6, solo si fueron autorizados.
+
+    Torch 2.6 cambió `weights_only` a True. Ultralytics 8.2.18 aún invoca
+    torch.load sin ese argumento. El parche es temporal, queda dentro del
+    lock de carga y solo se habilita para un checkpoint local confiable.
+    """
+    try:
+        return YOLO(model_path, task="detect")
+    except pickle.UnpicklingError:
+        if not _es_checkpoint_local_confiable(model_path):
+            raise
+
+        import torch
+        original_load = torch.load
+
+        def load_trusted_checkpoint(*args, **kwargs):
+            kwargs["weights_only"] = False
+            return original_load(*args, **kwargs)
+
+        torch.load = load_trusted_checkpoint
+        try:
+            return YOLO(model_path, task="detect")
+        finally:
+            torch.load = original_load
+
 def _load_yolo():
     """
     Carga el modelo YOLO una sola vez por proceso y lo cachea (mismo patrón
@@ -61,7 +107,20 @@ def _load_yolo():
         with _yolo_lock:
             if _yolo_model is None:
                 from ultralytics import YOLO
-                _yolo_model = YOLO(YOLO_MODEL, task="detect")
+                try:
+                    _yolo_model = _cargar_yolo_compatible(YOLO, YOLO_MODEL)
+                except Exception as primary_error:
+                    fallback_path = os.path.abspath(YOLO_FALLBACK_MODEL)
+                    if (
+                        fallback_path == os.path.abspath(YOLO_MODEL)
+                        or not os.path.isfile(fallback_path)
+                    ):
+                        raise primary_error
+                    print(
+                        f"[objects] No se pudo cargar '{YOLO_MODEL}' ({primary_error}). "
+                        f"Se usará el modelo ONNX de respaldo '{YOLO_FALLBACK_MODEL}'."
+                    )
+                    _yolo_model = YOLO(YOLO_FALLBACK_MODEL, task="detect")
     return _yolo_model
 
 

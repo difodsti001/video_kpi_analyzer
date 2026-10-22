@@ -939,31 +939,29 @@ function renderResultado(result, container) {
   const videoInfo = result.video_info || {};
   const competenciasMbdd = result.competencias_mbdd?.competencias || {};
   const struct   = clar.structure || {};
-  const tags   = buildTags(interp);
-  const resumenEjecutivo = ev.resumen_ejecutivo || '—';
-  const criteriosRubrica = ev.criterios || {};
+  const retroalimentacion = ev.retroalimentacion_pedagogica || ev.resumen_ejecutivo || '—';
+  const retroalimentacionLimpia = String(retroalimentacion)
+    .replace(/\\n/g, '\n')
+    .replace(/\\+/g, '\n');
+  const rubricaReferencia = ev.rubrica_referencia || [];
 
-  // Se muestran únicamente los niveles cualitativos, sin puntajes.
+  // La vista principal presenta una narrativa pedagógica, no una calificación.
   const heroHtml = `
-  <div class="score-hero">
-    <div style="flex:1">
-      <div class="score-tags">${tags}</div>
-    </div>
-  </div>
-
-  <div class="section-label">Retroalimentación</div>
+  <div class="section-label">Retroalimentación pedagógica</div>
   <div class="card">
-    <div class="feedback-box">${resumenEjecutivo.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>')}</div>
+    <div class="feedback-box">${retroalimentacionLimpia.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>')}</div>
   </div>
 
-  <div class="section-label">Niveles de la rúbrica</div>
+  <div class="section-label">Rúbrica de referencia</div>
   <div class="card" style="padding:14px 18px;margin-bottom:16px">
-    ${buildRubricaSection(criteriosRubrica)}
+    <div style="font-size:12px;color:var(--texto-2);margin-bottom:10px">Criterios usados para organizar la retroalimentación. No representan una calificación automática.</div>
+    ${buildRubricaReference(rubricaReferencia)}
   </div>`;
 
   const detailHtml = `
   <div style="margin:16px 0">
     <button class="btn-outline" onclick="verTranscripcion()">Ver transcripción</button>
+    <button class="btn-outline" onclick="verEvidenciasPedagogicas()" style="margin-left:8px">Ver evidencias pedagógicas</button>
   </div>
 
   <div class="section-label">Ficha técnica del video</div>
@@ -1161,6 +1159,16 @@ function buildRubricaSection(criterios) {
         <span style="font-size:13px;font-weight:500;color:var(--texto)">${id} · ${c.nombre}</span>
         <span class="badge" style="background:${NIVEL_COLOR[c.nivel]||'#94A3B8'}22;color:${NIVEL_COLOR[c.nivel]||'#57534E'}">${c.nivel}</span>
       </div>
+    </div>
+  `).join('');
+}
+
+function buildRubricaReference(criterios) {
+  if (!criterios.length) return `<div style="color:var(--texto-3);font-size:12px">No hay rúbrica de referencia disponible.</div>`;
+  return criterios.map(c => `
+    <div style="padding:10px 0;border-bottom:1px solid var(--borde)">
+      <div style="font-size:13px;font-weight:600;color:var(--texto)">${c.id} · ${c.nombre}</div>
+      <div style="font-size:12px;color:var(--texto-2);margin-top:3px">${c.que_evalua || ''}</div>
     </div>
   `).join('');
 }
@@ -1527,8 +1535,36 @@ function verTranscripcion() {
     : (state.currentResult?.transcript || '');
   if (!transcript) { showToast('No hay transcripción disponible'); return; }
   const modal = document.getElementById('modal-transcript');
+  document.getElementById('modal-title').textContent = 'Transcripción completa';
   document.getElementById('modal-text').textContent = transcript;
   modal.classList.remove('hidden');
+}
+
+async function verEvidenciasPedagogicas() {
+  if (!state.currentJobId) {
+    showToast('No hay análisis seleccionado');
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/analyze/${state.currentJobId}/ficha-evidencias`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const ventanas = data.ficha_evidencias?.transcripcion_multimodal || [];
+    if (!ventanas.length) {
+      showToast('No hay evidencias pedagógicas disponibles');
+      return;
+    }
+    const texto = ventanas.map(v => {
+      const audio = v.audio ? `Audio: ${v.audio}` : 'Audio: sin habla transcrita';
+      const visual = v.visual ? `Visual: ${v.visual}` : 'Visual: sin descripción visual';
+      return `[${v.inicio}–${v.fin}]\n${audio}\n${visual}`;
+    }).join('\n\n');
+    document.getElementById('modal-title').textContent = 'Evidencias pedagógicas';
+    document.getElementById('modal-text').textContent = texto;
+    document.getElementById('modal-transcript').classList.remove('hidden');
+  } catch (error) {
+    showToast('No fue posible cargar las evidencias pedagógicas');
+  }
 }
 function cerrarTranscripcion() {
   document.getElementById('modal-transcript').classList.add('hidden');
@@ -1704,7 +1740,7 @@ function formatBytes(bytes) {
 <div id="modal-transcript" class="modal-overlay hidden">
   <div class="modal-box">
     <div class="modal-header">
-      <div class="modal-title">Transcripción completa</div>
+      <div id="modal-title" class="modal-title">Transcripción completa</div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn-sm" onclick="copiarTranscripcion()">Copiar texto</button>
         <div class="close-btn" onclick="cerrarTranscripcion()">✕</div>

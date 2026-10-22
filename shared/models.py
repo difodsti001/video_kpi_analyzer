@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, DateTime, Text, JSON, ForeignKey, Float, Boolean
+from sqlalchemy import String, DateTime, Text, JSON, ForeignKey, Float, Boolean, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from shared.database import Base
 
@@ -68,3 +68,22 @@ class Evaluation(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AIUsage(Base):
+    """Trazabilidad de tokens por llamada a IA; no contiene precios."""
+    __tablename__ = "consumo_ia"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    extraction_id: Mapped[str] = mapped_column(String, ForeignKey("extracciones.id"), index=True)
+    evaluation_id: Mapped[str | None] = mapped_column(String, ForeignKey("evaluaciones.id"), nullable=True, index=True)
+    capa_ia: Mapped[str] = mapped_column(String)
+    proveedor: Mapped[str] = mapped_column(String)
+    modelo: Mapped[str] = mapped_column(String)
+    solicitudes: Mapped[int] = mapped_column(Integer, default=1)
+    imagenes_enviadas: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_entrada: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_salida: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_totales: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    estado: Mapped[str] = mapped_column(String, default="exitoso")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

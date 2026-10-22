@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore")
 
 from shared.database import engine, get_db, Base
-from shared.models   import Extraction, Evaluation
-from services.transversal.cursos.registro import CURSO_POR_DEFECTO
+from shared.models   import Extraction, Evaluation, AIUsage
+from services.transversal.cursos.registro import CURSO_POR_DEFECTO, obtener_curso
 import jobs
 
 Base.metadata.create_all(bind=engine)
@@ -280,22 +280,35 @@ def get_status(job_id: str, db: Session = Depends(get_db)):
 
 
 def _ocultar_calificacion(resultado: dict | None) -> dict | None:
-    """Oculta puntajes de la respuesta pública, conservando solo el nivel de
-    cada criterio como retroalimentación cualitativa."""
+    """Oculta calificaciones de la respuesta pública.
+
+    Los criterios, niveles y puntajes se conservan internamente para
+    compatibilidad, pero la vista pública recibe una narrativa pedagógica.
+    """
     if not resultado:
         return resultado
     evaluacion = resultado.get("evaluacion")
     if isinstance(evaluacion, dict):
-        criterios_visibles = {}
-        for criterio_id, criterio in evaluacion.get("criterios", {}).items():
-            if isinstance(criterio, dict):
-                criterios_visibles[criterio_id] = {
-                    "nombre": criterio.get("nombre", criterio_id),
-                    "nivel": criterio.get("nivel", "no evaluado"),
+        if not evaluacion.get("rubrica_referencia"):
+            try:
+                curso = obtener_curso(resultado.get("curso_id") or CURSO_POR_DEFECTO)
+                evaluacion = {
+                    **evaluacion,
+                    "rubrica_referencia": [
+                        {
+                            "id": criterio["id"],
+                            "nombre": criterio["nombre"],
+                            "que_evalua": criterio["que_evalua"],
+                        }
+                        for criterio in curso["criterios"]
+                    ],
                 }
+            except Exception:
+                # La retroalimentación existente sigue disponible aunque una
+                # configuración histórica de rúbrica no pueda consultarse.
+                pass
         evaluacion = {k: v for k, v in evaluacion.items()
                       if k not in ("score_final", "score_rubrica", "score_oratoria", "criterios")}
-        evaluacion["criterios"] = criterios_visibles
         resultado = {**resultado, "evaluacion": evaluacion}
     return resultado
 
@@ -393,7 +406,14 @@ def get_result_clean(job_id: str, db: Session = Depends(get_db)):
 
         "transcription_calidad": result.get("transcription_calidad", {}),
 
-        "resumen_ejecutivo": evaluacion.get("resumen_ejecutivo", "No se pudo generar la evaluación"),
+        "retroalimentacion_pedagogica": evaluacion.get(
+            "retroalimentacion_pedagogica",
+            evaluacion.get("resumen_ejecutivo", "No se pudo generar la retroalimentación pedagógica"),
+        ),
+        "resumen_ejecutivo": evaluacion.get(
+            "retroalimentacion_pedagogica",
+            evaluacion.get("resumen_ejecutivo", "No se pudo generar la retroalimentación pedagógica"),
+        ),
 
         "competencias_mbdd": result.get("competencias_mbdd", {}).get("competencias", {}),
 
@@ -406,4 +426,43 @@ def get_result_clean(job_id: str, db: Session = Depends(get_db)):
         },
 
         "details": result.get("kpis", {}),
+    }
+
+
+@app.get("/analyze/{job_id}/consumo-ia")
+def get_ai_usage(job_id: str, db: Session = Depends(get_db)):
+    filas = db.query(AIUsage).filter_by(extraction_id=job_id).order_by(AIUsage.created_at).all()
+    return {"job_id": job_id, "consumos": [{
+        "capa_ia": fila.capa_ia, "proveedor": fila.proveedor, "modelo": fila.modelo,
+        "solicitudes": fila.solicitudes, "imagenes_enviadas": fila.imagenes_enviadas,
+        "tokens_entrada": fila.tokens_entrada, "tokens_salida": fila.tokens_salida,
+        "tokens_totales": fila.tokens_totales, "estado": fila.estado,
+        "fecha_hora": fila.created_at.isoformat() if fila.created_at else None,
+    } for fila in filas]}
+
+
+@app.get("/analyze/{job_id}/ficha-evidencias")
+def get_evidence_sheet(job_id: str, db: Session = Depends(get_db)):
+    """Devuelve la ficha persistente, sin video, clips ni frames temporales."""
+    extraccion = db.query(Extraction).filter_by(id=job_id).first()
+    if not extraccion:
+        raise HTTPException(404, "Job no encontrado")
+    if extraccion.status != "done" or not extraccion.result:
+        return {
+            "job_id": job_id,
+            "status": extraccion.status,
+            "message": "La ficha estará disponible al terminar la extracción.",
+        }
+
+    ficha = extraccion.result.get("ficha_evidencias")
+    if not ficha:
+        raise HTTPException(
+            404,
+            "Este análisis fue creado antes de la ficha de evidencias; reprocesa el video para generarla.",
+        )
+    return {
+        "job_id": job_id,
+        "filename": extraccion.filename,
+        "status": extraccion.status,
+        "ficha_evidencias": ficha,
     }
